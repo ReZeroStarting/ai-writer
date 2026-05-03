@@ -1,0 +1,11 @@
+.superpowers/
+node_modules/
+target/
+*.class
+*.jar
+*.log
+.env
+.env.local
+.idea/
+*.iml
+dist/
