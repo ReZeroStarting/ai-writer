@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-writer
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_writer?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&createDatabaseIfNotExist=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  base-url: https://api.anthropic.com
+  model: claude-sonnet-4-6
+  temperature: 0.7
+  max-tokens: 4096
+
+jwt:
+  secret: ${JWT_SECRET:ai-writer-jwt-secret-key-2026-please-change-in-production}
+  access-token-expiration: 1800000
+  refresh-token-expiration: 604800000
