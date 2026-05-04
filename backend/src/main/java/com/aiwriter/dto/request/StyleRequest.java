@@ -8,7 +8,7 @@ import lombok.Data;
 public class StyleRequest {
     @NotBlank @Size(min = 1, max = 100)
     private String name;
-    @NotBlank
+    @Size(max = 5000)
     private String systemPrompt;
     @Size(max = 500)
     private String description;
