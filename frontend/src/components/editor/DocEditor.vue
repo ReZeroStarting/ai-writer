@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useDocStore } from '@/stores/documents'
 import TiptapEditor from './TiptapEditor.vue'
 import AIPanel from './AIPanel.vue'
@@ -38,13 +38,13 @@ function getHtmlToText() {
 
 const plainText = computed(() => getHtmlToText()(content.value))
 
-onMounted(async () => {
-  await store.fetchOne(props.docId)
+watch(() => props.docId, async (id) => {
+  await store.fetchOne(id)
   if (store.currentDoc) {
     title.value = store.currentDoc.title
     content.value = store.currentDoc.content || ''
   }
-})
+}, { immediate: true })
 
 let saveTimer: ReturnType<typeof setTimeout>
 function autoSave() {
