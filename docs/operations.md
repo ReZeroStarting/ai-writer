@@ -46,6 +46,21 @@ openssl rand -base64 32
 | 2026-05-03 | 使用 WebClient 裸调 Claude API 而非 Spring AI | Spring AI 对 SSE 流式支持的成熟度不足 |
 | 2026-05-04 | JWT 密钥移除硬编码默认值 | 安全问题：硬编码密钥可被用于伪造任意用户 Token |
 | 2026-05-04 | 异常处理改为分类型 HTTP 状态码 | 之前所有错误统一返回 400，前端无法区分认证失败和参数错误 |
+| 2026-05-04 | 添加暗色模式+护眼模式切换 | 提供 light/dark/eye-care 三种主题，persist 到 localStorage |
+| 2026-05-04 | 重命名 UI 文案并添加搜索栏 | "我的项目"→"小说列表"，"文档"→"章节"，侧边栏支持搜索过滤 |
+| 2026-05-04 | 风格管理独立为顶层路由 | 从 DashboardLayout 子路由移出，全屏显示，添加返回按钮 |
+
+## 主题切换
+
+AI Writer 支持三种主题模式，通过顶栏按钮循环切换：
+
+| 模式 | 效果 | CSS 实现 |
+|------|------|------|
+| light | 默认浅色主题 | Element Plus 默认 |
+| dark | 深色主题 | Element Plus `dark` class |
+| eye-care | 暖黄护眼模式 | 自定义 CSS 变量覆盖，背景 `#f5f0e8` |
+
+主题状态存储在 `localStorage` 的 `ai-writer-theme` 键中。
 
 ## 启动命令
 
