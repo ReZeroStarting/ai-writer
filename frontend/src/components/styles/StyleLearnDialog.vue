@@ -5,9 +5,9 @@
       <el-form-item label="文本内容">
         <el-input v-model="content" type="textarea" :rows="10" placeholder="粘贴小说原文或文本片段，或点击下方按钮上传文件..." />
         <div class="upload-row">
-          <input ref="fileInput" type="file" accept=".txt,.md,.text" style="display:none" @change="handleFileUpload" />
+          <input ref="fileInput" type="file" accept=".txt,.md,.text,.epub" style="display:none" @change="handleFileUpload" />
           <el-button size="small" @click="fileInput?.click()">📁 上传文件</el-button>
-          <span class="upload-hint">支持 .txt / .md 文件</span>
+          <span class="upload-hint">支持 .txt / .md / .epub 文件</span>
         </div>
       </el-form-item>
     </el-form>
@@ -30,6 +30,7 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { stylesApi } from '@/api/styles'
+import JSZip from 'jszip'
 import type { LearningJob } from '@/types'
 
 const props = defineProps<{ styleId: number; styleName: string }>()
@@ -40,10 +41,40 @@ const job = ref<LearningJob | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
+function htmlToText(html: string): string {
+  const el = document.createElement('div')
+  el.innerHTML = html
+  return (el.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+async function handleEpub(file: File) {
+  const buf = await file.arrayBuffer()
+  const zip = await JSZip.loadAsync(buf)
+  const htmlFiles = Object.keys(zip.files).filter(
+    f => f.endsWith('.html') || f.endsWith('.xhtml') || f.endsWith('.htm')
+  )
+  const texts: string[] = []
+  for (const name of htmlFiles) {
+    const html = await zip.files[name].async('string')
+    const text = htmlToText(html)
+    if (text) texts.push(text)
+  }
+  content.value = texts.join('\n\n')
+  if (!title.value.trim()) {
+    title.value = file.name.replace(/\.[^.]+$/, '')
+  }
+}
+
 function handleFileUpload(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+
+  if (file.name.endsWith('.epub')) {
+    handleEpub(file)
+    return
+  }
+
   const reader = new FileReader()
   reader.onload = () => {
     content.value = reader.result as string

@@ -17,11 +17,13 @@
     "@tiptap/vue-3": "^2.11",
     "axios": "^1.7",
     "element-plus": "^2.9",
+    "jszip": "^3.10.1",
     "pinia": "^2.3",
     "vue": "^3.5",
     "vue-router": "^4.5"
   },
   "devDependencies": {
+    "@types/jszip": "^3.4.0",
     "@vitejs/plugin-vue": "^5.2",
     "@vue/test-utils": "^2.4.10",
     "jsdom": "^29.1.1",
