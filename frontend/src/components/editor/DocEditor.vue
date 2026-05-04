@@ -40,11 +40,25 @@ const title = computed(() => {
   return text.split('\n')[0].slice(0, 60)
 })
 
+// Optimistically update sidebar title as user types
+watch(title, (t) => {
+  const d = store.docs.find(d => d.id === props.docId)
+  if (d) d.title = t
+})
+
+let previousId = 0
+
 watch(() => props.docId, async (id) => {
+  // Flush pending save for previous doc before switching
+  if (previousId && previousId !== id) {
+    clearTimeout(saveTimer)
+    await store.save(previousId, title.value, content.value)
+  }
   await store.fetchOne(id)
   if (store.currentDoc) {
     content.value = store.currentDoc.content || store.currentDoc.title || ''
   }
+  previousId = id
 }, { immediate: true })
 
 let saveTimer: ReturnType<typeof setTimeout>
