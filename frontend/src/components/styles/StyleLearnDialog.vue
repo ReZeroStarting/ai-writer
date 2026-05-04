@@ -37,9 +37,38 @@ const props = defineProps<{ styleId: number; styleName: string }>()
 
 const visible = ref(false); const loading = ref(false)
 const title = ref(''); const content = ref('')
+const rawLength = ref(0)
 const job = ref<LearningJob | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const MAX_CHARS = 15000
+const PASSAGE_LEN = 3000
+
+function smartSample(text: string): string {
+  if (text.length <= MAX_CHARS) return text
+  const positions = [0, 0.2, 0.4, 0.6, 0.8, 1]
+  const passages: string[] = []
+  const len = text.length
+  for (const pos of positions) {
+    let start = Math.floor(pos * (len - PASSAGE_LEN))
+    if (start < 0) start = 0
+    let passage = text.slice(start, start + PASSAGE_LEN).trim()
+    const breakIdx = Math.max(passage.lastIndexOf('\n'), passage.lastIndexOf('。'), passage.lastIndexOf('.'))
+    if (breakIdx > PASSAGE_LEN * 0.6) {
+      passage = passage.slice(0, breakIdx + 1)
+    }
+    if (passage.length > 200) passages.push(passage)
+  }
+  return passages.join('\n\n---\n\n')
+}
+
+function setContent(text: string, sourceName?: string) {
+  rawLength.value = text.length
+  content.value = smartSample(text)
+  if (sourceName && !title.value.trim()) {
+    title.value = sourceName.replace(/\.[^.]+$/, '')
+  }
+}
 
 function htmlToText(html: string): string {
   const el = document.createElement('div')
@@ -53,16 +82,21 @@ async function handleEpub(file: File) {
   const htmlFiles = Object.keys(zip.files).filter(
     f => f.endsWith('.html') || f.endsWith('.xhtml') || f.endsWith('.htm')
   )
-  const texts: string[] = []
+  // Sort by content length (longest chapters are likely the main content)
+  const chapterTexts: { name: string; text: string }[] = []
   for (const name of htmlFiles) {
     const html = await zip.files[name].async('string')
     const text = htmlToText(html)
-    if (text) texts.push(text)
+    if (text && text.length > 200) chapterTexts.push({ name, text })
   }
-  content.value = texts.join('\n\n')
-  if (!title.value.trim()) {
-    title.value = file.name.replace(/\.[^.]+$/, '')
+  chapterTexts.sort((a, b) => b.text.length - a.text.length)
+  // Take top chapters, up to ~50000 chars raw, then smart-sample
+  let combined = ''
+  for (const ch of chapterTexts) {
+    if (combined.length > 50000) break
+    combined += ch.text + '\n\n'
   }
+  setContent(combined, file.name)
 }
 
 function handleFileUpload(e: Event) {
@@ -77,10 +111,7 @@ function handleFileUpload(e: Event) {
 
   const reader = new FileReader()
   reader.onload = () => {
-    content.value = reader.result as string
-    if (!title.value.trim()) {
-      title.value = file.name.replace(/\.[^.]+$/, '')
-    }
+    setContent(reader.result as string, file.name)
   }
   reader.readAsText(file, 'UTF-8')
 }
