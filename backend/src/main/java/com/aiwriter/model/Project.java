@@ -21,6 +21,9 @@ public class Project {
     @Column(length = 500)
     private String description;
 
+    @Column(length = 20)
+    private String mode; // null = normal, "framework" = framework mode
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
