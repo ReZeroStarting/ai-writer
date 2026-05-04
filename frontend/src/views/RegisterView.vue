@@ -14,9 +14,9 @@ import RegisterForm from '@/components/auth/RegisterForm.vue'
 </script>
 
 <style scoped>
-.auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f5f7fa; }
+.auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--el-bg-color-page, #f5f7fa); }
 .auth-card { width: 420px; padding: 20px; }
 .auth-title { text-align: center; font-size: 28px; margin-bottom: 4px; }
-.auth-subtitle { text-align: center; color: #909399; margin-bottom: 24px; }
-.auth-link { text-align: center; margin-top: 16px; color: #909399; }
+.auth-subtitle { text-align: center; color: var(--el-text-color-secondary, #909399); margin-bottom: 24px; }
+.auth-link { text-align: center; margin-top: 16px; color: var(--el-text-color-secondary, #909399); }
 </style>

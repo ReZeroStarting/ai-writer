@@ -67,10 +67,10 @@ function insertText() { emit('insert', outputText.value); outputText.value = '' 
 </script>
 
 <style scoped>
-.ai-panel { width: 300px; border-left: 1px solid #e4e7ed; background: #fafafa; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; }
-.ai-panel-header { font-weight: 600; margin-bottom: 12px; }
+.ai-panel { width: 300px; border-left: 1px solid var(--el-border-color, #e4e7ed); background: var(--el-bg-color-page, #fafafa); padding: 12px; overflow-y: auto; display: flex; flex-direction: column; }
+.ai-panel-header { font-weight: 600; margin-bottom: 12px; color: var(--el-text-color-primary, #303133); }
 .ai-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
 .ai-output { margin-top: 12px; }
-.output-header { font-size: 13px; color: #409eff; margin-bottom: 8px; }
-.output-content { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px; min-height: 80px; max-height: 300px; overflow-y: auto; font-size: 14px; line-height: 1.7; }
+.output-header { font-size: 13px; color: var(--el-color-primary, #409eff); margin-bottom: 8px; }
+.output-content { background: var(--el-bg-color, #fff); border: 1px solid var(--el-border-color, #e4e7ed); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 300px; overflow-y: auto; font-size: 14px; line-height: 1.7; color: var(--el-text-color-primary, #303133); }
 </style>

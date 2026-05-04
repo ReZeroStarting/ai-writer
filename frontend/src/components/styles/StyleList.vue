@@ -26,10 +26,10 @@ async function handleDelete(id: number) { await store.remove(id); ElMessage.succ
 </script>
 
 <style scoped>
-.empty { text-align: center; color: #909399; padding: 60px; }
+.empty { text-align: center; color: var(--el-text-color-secondary, #909399); padding: 60px; }
 .style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .card-header h3 { margin: 0; }
-.card-desc { color: #909399; font-size: 13px; margin: 8px 0; }
-.card-prompt { background: #f5f7fa; padding: 10px; border-radius: 4px; font-size: 13px; color: #606266; white-space: pre-wrap; }
+.card-desc { color: var(--el-text-color-secondary, #909399); font-size: 13px; margin: 8px 0; }
+.card-prompt { background: var(--el-fill-color-light, #f5f7fa); padding: 10px; border-radius: 4px; font-size: 13px; color: var(--el-text-color-regular, #606266); white-space: pre-wrap; }
 </style>
