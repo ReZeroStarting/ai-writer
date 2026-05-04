@@ -22,14 +22,24 @@ const router = createRouter({
         { path: '', redirect: { name: 'workspace' } },
         { path: 'project/:id?', name: 'workspace', component: () => import('@/views/WorkspaceView.vue') },
         { path: 'project/:projectId/doc/:docId', name: 'editor', component: () => import('@/views/WorkspaceView.vue') },
-        { path: 'styles', name: 'styles', component: () => import('@/views/StyleManageView.vue') },
       ],
+    },
+    {
+      path: '/styles', name: 'styles',
+      component: () => import('@/views/StyleManageView.vue'),
+      meta: { requiresAuth: true },
     },
   ],
 })
 
-router.beforeEach((to, _from, next) => {
+let authReady = false
+
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
+  if (!authReady) {
+    await auth.init()
+    authReady = true
+  }
   if (to.meta.requiresAuth && !auth.isLoggedIn) next('/login')
   else if (to.meta.guest && auth.isLoggedIn) next('/')
   else next()

@@ -8,6 +8,15 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(localStorage.getItem('access_token'))
   const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
   const isLoggedIn = computed(() => !!accessToken.value)
+  const isReady = ref(false)
+
+  async function init() {
+    if (accessToken.value && refreshToken.value) {
+      const ok = await refresh()
+      if (!ok) logout()
+    }
+    isReady.value = true
+  }
 
   function setAuth(data: any) {
     accessToken.value = data.accessToken
@@ -34,5 +43,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token')
   }
 
-  return { user, accessToken, refreshToken, isLoggedIn, login, register, refresh, logout }
+  return { user, accessToken, refreshToken, isLoggedIn, isReady, init, login, register, refresh, logout }
 })

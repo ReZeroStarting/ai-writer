@@ -1,0 +1,23 @@
+html.eye-care {
+  --el-bg-color: #f5f0e8;
+  --el-bg-color-page: #ede8dd;
+  --el-bg-color-overlay: #f5f0e8;
+  --el-border-color: #d5cfc4;
+  --el-border-color-light: #e0dbd0;
+  --el-fill-color: #f0ebe0;
+  --el-fill-color-light: #f5f1e8;
+  --el-fill-color-blank: #f5f0e8;
+}
+
+html.eye-care body {
+  background-color: #f5f0e8;
+}
+
+html.eye-care .app-header {
+  background-color: #f5f0e8;
+}
+
+html.eye-care .sidebar,
+html.eye-care .doc-list {
+  background-color: #ede8dd;
+}

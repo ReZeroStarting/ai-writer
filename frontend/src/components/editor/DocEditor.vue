@@ -61,6 +61,6 @@ function handleInsert(text: string) { content.value = content.value + text }
 
 <style scoped>
 .doc-editor { height: 100%; display: flex; flex-direction: column; }
-.doc-header { padding: 12px 16px; border-bottom: 1px solid #e4e7ed; }
+.doc-header { padding: 12px 16px; border-bottom: 1px solid var(--el-border-color, #e4e7ed); }
 .doc-body { flex: 1; display: flex; overflow: hidden; }
 </style>

@@ -26,5 +26,5 @@ watch(projectId, (id) => { if (id) projects.setCurrent(id) }, { immediate: true 
 <style scoped>
 .workspace { display: flex; height: 100%; }
 .editor-area { flex: 1; }
-.empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #909399; font-size: 16px; }
+.empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--el-text-color-secondary, #909399); font-size: 16px; }
 </style>

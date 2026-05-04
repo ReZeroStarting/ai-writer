@@ -20,5 +20,5 @@ onMounted(() => projects.fetch())
 <style scoped>
 .dashboard { height: 100vh; display: flex; flex-direction: column; }
 .dashboard-body { flex: 1; display: flex; overflow: hidden; }
-.main-content { flex: 1; overflow-y: auto; background: #fff; }
+.main-content { flex: 1; overflow-y: auto; background: var(--el-bg-color, #fff); }
 </style>
