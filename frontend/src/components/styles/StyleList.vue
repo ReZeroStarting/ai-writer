@@ -1,5 +1,8 @@
 <template>
-  <div v-if="store.styles.length === 0" class="empty">还没有写作风格，创建一个开始吧</div>
+  <div v-if="store.styles.length === 0" class="empty">
+    <p>还没有写作风格</p>
+    <p class="empty-hint">点击上方"+ 新建风格"按钮创建第一个风格。<br/>可以手写 System Prompt，也可以先创建再上传小说素材让 AI 学习。</p>
+  </div>
   <div v-else class="style-grid">
     <el-card v-for="s in store.styles" :key="s.id" class="style-card">
       <div class="card-header">
@@ -27,6 +30,8 @@ async function handleDelete(id: number) { await store.remove(id); ElMessage.succ
 
 <style scoped>
 .empty { text-align: center; color: var(--el-text-color-secondary, #909399); padding: 60px; }
+.empty p { margin: 0; font-size: 15px; }
+.empty-hint { font-size: 13px !important; margin-top: 8px !important; line-height: 1.8; }
 .style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .card-header h3 { margin: 0; }

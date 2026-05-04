@@ -5,7 +5,8 @@
       <el-form-item label="描述"><el-input v-model="form.description" placeholder="简短描述" /></el-form-item>
       <el-form-item label="System Prompt">
         <el-input v-model="form.systemPrompt" type="textarea" :rows="6"
-          placeholder="直接填写写作风格指令，或留空后通过上传素材让 AI 自动生成" />
+          placeholder="直接填写写作风格指令，或留空后通过「上传素材学习」让 AI 自动生成" />
+        <div class="form-hint">可以留空。创建完成后，在风格卡片中点击"上传素材学习"粘贴小说文本，AI 会自动分析并生成 System Prompt。</div>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -26,10 +27,14 @@ const store = useStyleStore()
 const form = reactive({ name: '', systemPrompt: '', description: '' })
 
 async function handleCreate() {
-  if (!form.name.trim() || !form.systemPrompt.trim()) { ElMessage.warning('名称和 System Prompt 为必填'); return }
+  if (!form.name.trim()) { ElMessage.warning('请填写风格名称'); return }
   await store.create(form.name, form.systemPrompt, form.description)
   ElMessage.success('风格创建成功')
   form.name = ''; form.systemPrompt = ''; form.description = ''
   emit('update:modelValue', false)
 }
 </script>
+
+<style scoped>
+.form-hint { font-size: 12px; color: var(--el-text-color-secondary, #909399); margin-top: 4px; line-height: 1.6; }
+</style>
