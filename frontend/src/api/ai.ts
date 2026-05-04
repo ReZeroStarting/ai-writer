@@ -12,4 +12,8 @@ export const aiApi = {
     client.post('/ai/expand', data, { responseType: 'stream', adapter: 'fetch' }),
   shorten: (data: AiRequest) =>
     client.post('/ai/shorten', data, { responseType: 'stream', adapter: 'fetch' }),
+  autoWrite: (data: AiRequest) =>
+    client.post('/ai/auto-write', data, { responseType: 'stream', adapter: 'fetch' }),
+  imitateWrite: (data: AiRequest) =>
+    client.post('/ai/imitate-write', data, { responseType: 'stream', adapter: 'fetch' }),
 }

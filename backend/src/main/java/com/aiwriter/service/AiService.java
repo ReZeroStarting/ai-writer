@@ -56,6 +56,23 @@ public class AiService {
         return claude.stream(prompts.buildShortenSystem(style), msg);
     }
 
+    public Flux<String> autoWrite(AiRequest req) {
+        log.info("AI自动写作: topic={}", req.getContent().substring(0, Math.min(100, req.getContent().length())));
+        String style = getStylePrompt(req.getStyleTemplateId());
+        String msg = "写作主题：" + req.getContent();
+        if (req.getInstruction() != null) msg += "\n\n补充要求：" + req.getInstruction();
+        return claude.stream(prompts.buildAutoWriteSystem(style), msg);
+    }
+
+    public Flux<String> imitateWrite(AiRequest req) {
+        log.info("AI仿写: refLen={}, topic={}", req.getContent().length(),
+                req.getInstruction() != null ? req.getInstruction().substring(0, Math.min(50, req.getInstruction().length())) : "none");
+        String style = getStylePrompt(req.getStyleTemplateId());
+        String msg = "参考文本（请模仿其风格）：\n\n" + req.getContent();
+        if (req.getInstruction() != null) msg += "\n\n写作主题：" + req.getInstruction();
+        return claude.stream(prompts.buildImitateSystem(style), msg);
+    }
+
     private String getStylePrompt(Long id) {
         if (id == null) return null;
         return styleRepo.findById(id).map(StyleTemplate::getSystemPrompt).orElse(null);

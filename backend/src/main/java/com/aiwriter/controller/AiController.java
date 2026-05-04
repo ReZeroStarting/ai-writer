@@ -38,4 +38,14 @@ public class AiController {
     public Flux<String> shorten(@Valid @RequestBody AiRequest req) {
         return aiService.shorten(req);
     }
+
+    @PostMapping(value = "/auto-write", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> autoWrite(@Valid @RequestBody AiRequest req) {
+        return aiService.autoWrite(req);
+    }
+
+    @PostMapping(value = "/imitate-write", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> imitateWrite(@Valid @RequestBody AiRequest req) {
+        return aiService.imitateWrite(req);
+    }
 }

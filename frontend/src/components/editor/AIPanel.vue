@@ -13,6 +13,8 @@
             <el-button size="small" @click="callAi('polish')">改写润色</el-button>
             <el-button size="small" @click="callAi('expand')">扩写</el-button>
             <el-button size="small" @click="callAi('shorten')">缩写</el-button>
+            <el-button size="small" type="primary" @click="writeDialog?.open('auto')">AI 自动写作</el-button>
+            <el-button size="small" type="primary" @click="writeDialog?.open('imitate')">AI 仿写</el-button>
           </div>
 
           <el-input v-model="instruction" type="textarea" :rows="2" placeholder="额外指令（可选）" size="small" style="margin-top:8px;" />
@@ -96,6 +98,8 @@
         </div>
       </el-tab-pane>
     </el-tabs>
+
+    <AiWriteDialog ref="writeDialog" @insert="handleInsert" />
   </div>
 </template>
 
@@ -105,6 +109,7 @@ import { ElMessage } from 'element-plus'
 import { aiApi } from '@/api/ai'
 import { useStyleStore } from '@/stores/styles'
 import { analyzeWriting, type WritingReport } from '@/utils/writingCheck'
+import AiWriteDialog from './AiWriteDialog.vue'
 
 const props = defineProps<{ editorContent: string }>()
 const emit = defineEmits(['insert'])
@@ -115,6 +120,7 @@ const styleId = ref<number | undefined>()
 const instruction = ref('')
 const streaming = ref(false)
 const outputText = ref('')
+const writeDialog = ref<InstanceType<typeof AiWriteDialog> | null>(null)
 
 onMounted(() => styleStore.fetch())
 
@@ -165,6 +171,7 @@ async function callAi(endpoint: string) {
 }
 
 function insertText() { emit('insert', outputText.value); outputText.value = '' }
+function handleInsert(text: string) { emit('insert', text) }
 </script>
 
 <style scoped>

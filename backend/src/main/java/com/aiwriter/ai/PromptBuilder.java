@@ -28,4 +28,15 @@ public class PromptBuilder {
     public String buildShortenSystem(String s) {
         return wrapStyle("你是一个专业编辑。请精简用户提供的内容，删除冗余，保留核心信息和精华表达。", s);
     }
+
+    public String buildAutoWriteSystem(String s) {
+        return wrapStyle("你是一个专业小说作家。请根据用户提供的主题和设定，创作一篇完整的短篇小说或章节。" +
+                "包含生动的场景描写、人物对话和情节推进。字数在1000-3000字之间。", s);
+    }
+
+    public String buildImitateSystem(String s) {
+        return wrapStyle("你是一个精通模仿写作的专业作家。请仔细分析用户提供的参考文本的写作风格（句式特征、用词偏好、" +
+                "叙事节奏、情绪基调），然后用相同的风格，根据用户指定的主题进行创作。" +
+                "务必保持参考文本的神韵和笔触，而不是简单套用模板。", s);
+    }
 }
