@@ -1,0 +1,126 @@
+package com.aiwriter.service;
+
+import com.aiwriter.dto.request.ResolveConflictRequest;
+import com.aiwriter.dto.response.ConflictResponse;
+import com.aiwriter.exception.NotFoundException;
+import com.aiwriter.model.*;
+import com.aiwriter.repository.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+public class ConflictService {
+    private final ConflictRepository conflictRepo;
+    private final PatchRepository patchRepo;
+    private final ChapterRepository chapterRepo;
+    private final FrameworkElementRepository elementRepo;
+    private final FrameworkService frameworkService;
+    private final EventService eventService;
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public List<ConflictResponse> listByFramework(Long userId, Long frameworkId) {
+        frameworkService.findOwned(userId, frameworkId);
+        return conflictRepo.findByFrameworkIdOrderByCreatedAtDesc(frameworkId).stream()
+                .map(this::toResponse).toList();
+    }
+
+    public ConflictResponse resolve(Long userId, Long frameworkId, Long conflictId, ResolveConflictRequest req) {
+        frameworkService.findOwned(userId, frameworkId);
+        Conflict c = conflictRepo.findById(conflictId)
+                .orElseThrow(() -> new NotFoundException("冲突不存在"));
+
+        switch (req.getAction()) {
+            case "ignore":
+                c.setStatus(Conflict.ConflictStatus.IGNORED);
+                break;
+            case "patch":
+                c.setStatus(Conflict.ConflictStatus.PATCHED);
+                Patch patch = Patch.builder().conflict(c).content(req.getPatchContent())
+                        .affectedChapterIds("[]").build();
+                patchRepo.save(patch);
+                eventService.appendEventInternal(c.getFramework(), WritingEvent.EventType.PATCH_APPLIED,
+                        Map.of("conflictId", c.getId(), "patchContent", req.getPatchContent()));
+                break;
+            case "rewrite":
+                c.setStatus(Conflict.ConflictStatus.REWRITTEN);
+                break;
+            default:
+                throw new IllegalArgumentException("无效的操作: " + req.getAction());
+        }
+        conflictRepo.save(c);
+        eventService.appendEventInternal(c.getFramework(), WritingEvent.EventType.CONFLICT_RESOLVED,
+                Map.of("conflictId", c.getId(), "resolution", req.getAction()));
+        return toResponse(c);
+    }
+
+    public List<Long> getImpactedChapters(Long userId, Long frameworkId, String elementId) {
+        frameworkService.findOwned(userId, frameworkId);
+        var latestVersion = elementRepo.findMaxVersionByElementId(elementId).orElse(1);
+        return chapterRepo.findByFrameworkIdOrderByChapterIndexAsc(frameworkId).stream()
+                .filter(ch -> {
+                    Map<String, Integer> snap = parseSnapshot(ch.getElementSnapshot());
+                    Integer refVersion = snap.get(elementId);
+                    return refVersion != null && refVersion < latestVersion;
+                })
+                .map(Chapter::getId)
+                .toList();
+    }
+
+    /**
+     * Check a newly generated chapter against current element versions.
+     * Returns list of conflicts found. All conflicts start as PENDING.
+     */
+    public List<Conflict> checkChapterConsistency(Framework fw, Chapter chapter, String aiGeneratedContent) {
+        List<Conflict> conflicts = new ArrayList<>();
+        Map<String, Integer> snapshot = parseSnapshot(chapter.getElementSnapshot());
+        var currentElements = elementRepo.findLatestByFrameworkId(fw.getId());
+
+        for (var el : currentElements) {
+            Integer snapVer = snapshot.get(el.getId());
+            if (snapVer != null && snapVer < el.getVersion()) {
+                Conflict c = Conflict.builder()
+                        .framework(fw).elementId(el.getId()).chapter(chapter)
+                        .severity(Conflict.ConflictSeverity.MINOR)
+                        .description("元素 [" + el.getName() + "] 在章节生成后被修改（v" + snapVer + " → v" + el.getVersion() + "）")
+                        .chapterRefVersion(snapVer)
+                        .currentVersion(el.getVersion())
+                        .status(Conflict.ConflictStatus.PENDING)
+                        .build();
+                conflictRepo.save(c);
+                conflicts.add(c);
+                eventService.appendEventInternal(fw, WritingEvent.EventType.CONFLICT_DETECTED,
+                        Map.of("conflictId", c.getId(), "severity", "MINOR", "elementId", el.getId()));
+            }
+        }
+        return conflicts;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Integer> parseSnapshot(String json) {
+        if (json == null || json.isEmpty()) return Map.of();
+        try {
+            Map<String, Object> raw = mapper.readValue(json, Map.class);
+            Map<String, Integer> result = new HashMap<>();
+            for (var entry : raw.entrySet()) {
+                Object value = entry.getValue();
+                if (value instanceof Integer i) result.put(entry.getKey(), i);
+                else if (value instanceof Number n) result.put(entry.getKey(), n.intValue());
+            }
+            return result;
+        } catch (Exception e) { return Map.of(); }
+    }
+
+    private ConflictResponse toResponse(Conflict c) {
+        return ConflictResponse.builder()
+                .id(c.getId()).elementId(c.getElementId())
+                .chapterId(c.getChapter().getId())
+                .chapterRefVersion(c.getChapterRefVersion())
+                .currentVersion(c.getCurrentVersion())
+                .severity(c.getSeverity().name()).description(c.getDescription())
+                .status(c.getStatus().name()).createdAt(c.getCreatedAt().toString())
+                .build();
+    }
+}
