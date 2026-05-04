@@ -66,3 +66,64 @@ export interface RegisterRequest {
   phone?: string
   password: string
 }
+
+// === Framework Types ===
+
+export interface Framework {
+  id: number
+  projectId: number
+  status: 'ACTIVE' | 'FINISHED'
+  elementCount: number
+  chapterCount: number
+  unresolvedConflictCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FrameworkElement {
+  id: string
+  version: number
+  type: string
+  name: string
+  content: string
+  isDeprecated: boolean
+  createdAt: string
+}
+
+export interface Chapter {
+  id: number
+  documentId: number
+  chapterIndex: number
+  status: 'DRAFT' | 'AI_GENERATING' | 'AI_GENERATED' | 'USER_EDITING' | 'COMPLETED'
+  summary: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WritingEvent {
+  id: number
+  eventType: string
+  payload: string
+  timestamp: string
+}
+
+export interface Conflict {
+  id: number
+  elementId: string
+  chapterId: number
+  chapterRefVersion: number
+  currentVersion: number
+  severity: 'MAJOR' | 'MINOR'
+  description: string
+  status: 'PENDING' | 'IGNORED' | 'PATCHED' | 'REWRITTEN'
+  createdAt: string
+}
+
+export const ELEMENT_TYPES = [
+  { value: 'CHARACTER', label: '角色' },
+  { value: 'LOCATION', label: '地点' },
+  { value: 'ITEM', label: '物品/道具' },
+  { value: 'ORGANIZATION', label: '组织/势力' },
+  { value: 'EVENT', label: '事件/时间线' },
+  { value: 'WORLD_SETTING', label: '世界观设定' },
+] as const
