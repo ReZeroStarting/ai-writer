@@ -3,6 +3,7 @@ import type { Framework, FrameworkElement, Chapter, WritingEvent, Conflict } fro
 
 export const frameworkApi = {
   open: (projectId: number) => client.post<Framework>(`/v1/projects/${projectId}/framework`),
+  getByProjectId: (projectId: number) => client.get<Framework>(`/v1/projects/${projectId}/framework`),
   get: (id: number) => client.get<Framework>(`/v1/frameworks/${id}`),
   finish: (id: number) => client.post<Framework>(`/v1/frameworks/${id}/finish`),
 
@@ -26,7 +27,11 @@ export const frameworkApi = {
   continueWriting: (fwId: number) =>
     client.post(`/v1/frameworks/${fwId}/write/continue`, null, { responseType: 'stream', adapter: 'fetch' }),
   intervene: (fwId: number, data: { content: string; position?: string }) =>
-    client.post(`/v1/frameworks/${fwId}/write/interrupt`, data),
+    client.post<Chapter>(`/v1/frameworks/${fwId}/write/interrupt`, data),
+  saveChapter: (fwId: number, chapterId: number, content: string) =>
+    client.post(`/v1/frameworks/${fwId}/write/save`, { chapterId, content }),
+  getLatestChapter: (fwId: number) =>
+    client.get<Chapter>(`/v1/frameworks/${fwId}/write/latest-chapter`),
 
   // Conflicts
   listConflicts: (fwId: number) => client.get<Conflict[]>(`/v1/frameworks/${fwId}/conflicts`),

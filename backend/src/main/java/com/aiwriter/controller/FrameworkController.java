@@ -18,6 +18,11 @@ public class FrameworkController {
         return ResponseEntity.ok(frameworkService.openFramework(getUserId(auth), projectId));
     }
 
+    @GetMapping("/projects/{projectId}/framework")
+    public ResponseEntity<FrameworkResponse> getByProject(@PathVariable Long projectId, Authentication auth) {
+        return ResponseEntity.ok(frameworkService.getByProjectId(getUserId(auth), projectId));
+    }
+
     @GetMapping("/frameworks/{id}")
     public ResponseEntity<FrameworkResponse> get(@PathVariable Long id, Authentication auth) {
         return ResponseEntity.ok(frameworkService.getFramework(getUserId(auth), id));

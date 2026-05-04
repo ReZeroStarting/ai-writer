@@ -44,6 +44,14 @@ public class FrameworkService {
         return toResponse(fw);
     }
 
+    public FrameworkResponse getByProjectId(Long userId, Long projectId) {
+        Framework fw = frameworkRepo.findByProjectId(projectId)
+                .orElseThrow(() -> new NotFoundException("该项目未开启框架模式"));
+        if (!fw.getUser().getId().equals(userId))
+            throw new ForbiddenException("无权操作此框架");
+        return toResponse(fw);
+    }
+
     public FrameworkResponse finishFramework(Long userId, Long frameworkId) {
         Framework fw = findOwned(userId, frameworkId);
         fw.setStatus(Framework.FrameworkStatus.FINISHED);

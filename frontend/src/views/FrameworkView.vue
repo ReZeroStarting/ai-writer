@@ -66,6 +66,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFrameworkStore } from '@/stores/framework'
+import { frameworkApi } from '@/api/framework'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
@@ -76,7 +77,9 @@ const fw = computed(() => fwStore.framework)
 onMounted(async () => {
   const projectId = Number(route.params.id)
   try {
-    await fwStore.fetchFramework(projectId)
+    const res = await frameworkApi.getByProjectId(projectId)
+    fwStore.framework = res.data
+    await fwStore.fetchFramework(res.data.id)
   } catch {
     try {
       await fwStore.openFramework(projectId)

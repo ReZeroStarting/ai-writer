@@ -82,6 +82,7 @@ const fwStore = useFrameworkStore()
 const elements = computed(() => fwStore.elements)
 const chapters = ref<any[]>([])
 const currentContent = ref('')
+const currentChapterId = ref<number | null>(null)
 const isWriting = ref(false)
 const showIntervene = ref(false)
 const showContextDetail = ref(false)
@@ -112,6 +113,12 @@ async function startWriting() {
   isWriting.value = true
   currentContent.value = ''
   try {
+    // Fetch latest chapter to get its ID
+    try {
+      const chRes = await frameworkApi.getLatestChapter(fwId)
+      currentChapterId.value = chRes.data.id
+    } catch { currentChapterId.value = null }
+
     const response = await frameworkApi.startWriting(fwId)
     const reader = response.data.getReader()
     const decoder = new TextDecoder()
@@ -119,6 +126,12 @@ async function startWriting() {
       const { done, value } = await reader.read()
       if (done) break
       currentContent.value += decoder.decode(value, { stream: true })
+    }
+    // Save content after stream completes
+    if (currentChapterId.value) {
+      try {
+        await frameworkApi.saveChapter(fwId, currentChapterId.value, currentContent.value)
+      } catch { /* save failure is non-fatal */ }
     }
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || 'AI 写作失败')

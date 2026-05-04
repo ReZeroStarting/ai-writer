@@ -79,13 +79,24 @@ public class NovelWriteService {
                 });
     }
 
+    public void intervene(Long userId, Long frameworkId, Long chapterId, String userContent) {
+        Framework fw = frameworkService.findOwned(userId, frameworkId);
+        Chapter ch = chapterRepo.findById(chapterId).orElseThrow();
+        Document doc = ch.getDocument();
+        if (doc != null) {
+            String current = doc.getContent() != null ? doc.getContent() : "";
+            doc.setContent(current + "\n\n【用户插入】\n" + userContent + "\n");
+            documentRepo.save(doc);
+        }
+        ch.setStatus(Chapter.ChapterStatus.USER_EDITING);
+        chapterRepo.save(ch);
+    }
+
     public void saveChapterContent(Long chapterId, String content) {
-        var chapters = chapterRepo.findByFrameworkIdOrderByChapterIndexAsc(
-                chapterRepo.findById(chapterId).orElseThrow().getFramework().getId());
-        Chapter ch = chapters.stream()
-                .filter(c -> c.getId().equals(chapterId)).findFirst().orElse(null);
-        if (ch != null && ch.getDocument() != null) {
-            Document doc = ch.getDocument();
+        Chapter ch = chapterRepo.findById(chapterId).orElse(null);
+        if (ch == null) return;
+        Document doc = ch.getDocument();
+        if (doc != null) {
             doc.setContent(content);
             documentRepo.save(doc);
         }
