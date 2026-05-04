@@ -6,6 +6,7 @@ import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.DocumentRepository;
 import com.aiwriter.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProjectService {
     private final ProjectRepository projectRepo;
+    private final DocumentRepository docRepo;
 
     public List<ProjectResponse> list(Long userId) {
         return projectRepo.findByUserIdOrderByUpdatedAtDesc(userId)
@@ -38,6 +40,7 @@ public class ProjectService {
     @Transactional
     public void delete(Long userId, Long projectId) {
         findOwned(userId, projectId);
+        docRepo.deleteByProjectId(projectId);
         projectRepo.deleteById(projectId);
     }
 

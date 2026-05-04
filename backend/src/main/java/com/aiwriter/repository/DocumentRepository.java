@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findByProjectIdOrderByUpdatedAtDesc(Long projectId);
+    void deleteByProjectId(Long projectId);
 }
