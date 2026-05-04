@@ -3,7 +3,12 @@
     <el-form>
       <el-form-item label="素材标题"><el-input v-model="title" placeholder="例如：《百年孤独》节选" /></el-form-item>
       <el-form-item label="文本内容">
-        <el-input v-model="content" type="textarea" :rows="10" placeholder="粘贴小说原文或文本片段..." />
+        <el-input v-model="content" type="textarea" :rows="10" placeholder="粘贴小说原文或文本片段，或点击下方按钮上传文件..." />
+        <div class="upload-row">
+          <input ref="fileInput" type="file" accept=".txt,.md,.text" style="display:none" @change="handleFileUpload" />
+          <el-button size="small" @click="fileInput?.click()">📁 上传文件</el-button>
+          <span class="upload-hint">支持 .txt / .md 文件</span>
+        </div>
       </el-form-item>
     </el-form>
     <div v-if="job" class="job-status">
@@ -33,6 +38,22 @@ const visible = ref(false); const loading = ref(false)
 const title = ref(''); const content = ref('')
 const job = ref<LearningJob | null>(null)
 
+const fileInput = ref<HTMLInputElement | null>(null)
+
+function handleFileUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    content.value = reader.result as string
+    if (!title.value.trim()) {
+      title.value = file.name.replace(/\.[^.]+$/, '')
+    }
+  }
+  reader.readAsText(file, 'UTF-8')
+}
+
 async function handleLearn() {
   if (!title.value.trim() || !content.value.trim()) { ElMessage.warning('请填写标题和内容'); return }
   loading.value = true
@@ -57,4 +78,6 @@ async function handleLearn() {
 
 <style scoped>
 .job-status { margin-top: 12px; }
+.upload-row { margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+.upload-hint { font-size: 12px; color: var(--el-text-color-secondary, #909399); }
 </style>
