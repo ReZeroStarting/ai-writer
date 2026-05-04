@@ -1,8 +1,5 @@
 <template>
   <div class="doc-editor" v-if="doc">
-    <div class="doc-header">
-      <el-input v-model="title" size="large" placeholder="文档标题" @blur="autoSave" />
-    </div>
     <div class="doc-body">
       <TiptapEditor v-model="content" />
       <AIPanel :editor-content="plainText" @insert="handleInsert" />
@@ -19,7 +16,6 @@ import AIPanel from './AIPanel.vue'
 const props = defineProps<{ docId: number }>()
 const store = useDocStore()
 
-const title = ref('')
 const content = ref('')
 
 const doc = computed(() => store.currentDoc)
@@ -38,11 +34,16 @@ function getHtmlToText() {
 
 const plainText = computed(() => getHtmlToText()(content.value))
 
+const title = computed(() => {
+  const text = plainText.value.trim()
+  if (!text) return '未命名章节'
+  return text.split('\n')[0].slice(0, 60)
+})
+
 watch(() => props.docId, async (id) => {
   await store.fetchOne(id)
   if (store.currentDoc) {
-    title.value = store.currentDoc.title
-    content.value = store.currentDoc.content || ''
+    content.value = store.currentDoc.content || store.currentDoc.title || ''
   }
 }, { immediate: true })
 
@@ -54,13 +55,12 @@ function autoSave() {
   }, 3000)
 }
 
-watch([title, content], autoSave)
+watch(content, autoSave)
 
 function handleInsert(text: string) { content.value = content.value + text }
 </script>
 
 <style scoped>
 .doc-editor { height: 100%; display: flex; flex-direction: column; }
-.doc-header { padding: 12px 16px; border-bottom: 1px solid var(--el-border-color, #e4e7ed); }
 .doc-body { flex: 1; display: flex; overflow: hidden; }
 </style>
