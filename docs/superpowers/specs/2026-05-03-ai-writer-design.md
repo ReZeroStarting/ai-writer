@@ -9,9 +9,10 @@ AI Writer 是一个多用户 SaaS 写作平台，集成 Anthropic Claude 提供 
 | 层 | 技术 |
 |---|---|
 | 前端 | Vue 3 + Vite + Element Plus + Tiptap + Pinia |
-| 后端 | Spring Boot 3 + Spring AI + Spring Security + Spring Data JPA |
+| 后端 | Spring Boot 3.5 + WebClient + Spring Security + Spring Data JPA |
 | 数据库 | MySQL |
-| AI | Anthropic Claude (通过 Spring AI 集成) |
+| AI | Anthropic Claude (WebClient 裸调 Messages API，SSE 流式) |
+| 日志 | SLF4J + Logback，AOP 请求切面 |
 | 项目结构 | Monorepo 单仓库 |
 
 ## 核心功能
@@ -39,10 +40,20 @@ AI Writer 是一个多用户 SaaS 写作平台，集成 Anthropic Claude 提供 
 ```
 前端 (Vue 3 + Element Plus + Tiptap)
   │ HTTP REST + SSE 流式
-后端 (Spring Boot 3 + Spring AI)
+后端 (Spring Boot 3.5 + WebClient + Spring Security + JPA)
   │ JDBC / JPA
 MySQL (users, projects, documents, style_templates, source_materials, learning_jobs)
 ```
+
+### 环境变量
+
+| 变量 | 必须 | 说明 |
+|------|------|------|
+| `ANTHROPIC_API_KEY` | 是 | Claude API 密钥 |
+| `JWT_SECRET` | 是 | JWT 签名密钥，**无默认值，不设启动失败** |
+| `MYSQL_PASSWORD` | 是 | 数据库密码 |
+| `MYSQL_USER` | 否 | 默认 `root` |
+| `LOG_PATH` | 否 | 默认 `./logs` |
 
 ### 前端组件树
 
@@ -137,16 +148,33 @@ MySQL (users, projects, documents, style_templates, source_materials, learning_j
 
 ## 错误处理
 
-- 前端：Axios 统一拦截（401 → 刷新 token，403/429/500 → Toast）
+### HTTP 状态码规范
+
+| 状态码 | 异常类型 | 场景 |
+|--------|------|------|
+| 200 | — | 成功 |
+| 400 | `IllegalArgumentException` | 参数校验失败 |
+| 401 | `AuthException` | 未登录 / Token 无效 / 密码错误 |
+| 403 | `ForbiddenException` | 无权操作他人资源 |
+| 404 | `NotFoundException` | 资源不存在 |
+| 500 | `RuntimeException` | 服务器内部错误（日志记录堆栈） |
+
+- 前端：Axios 统一拦截（401 → 刷新 token，有防无限循环保护；其他 → Toast）
 - AI 流式中断：保留已生成内容
-- 编辑器保护：30 秒自动保存草稿到 localStorage
-- 后端：@ControllerAdvice 统一异常处理
+- 编辑器保护：3 秒自动保存到后端
 - 风格学习失败：learning_job status = FAILED，记录 error_msg
+
+## 日志
+
+- 框架：SLF4J + Logback（`logback-spring.xml`）
+- 请求日志：AOP 切面自动记录所有 Controller 请求（IP、方法、URI、耗时）
+- 业务日志：AuthService（登录/注册）、AiService（5 种 AI 操作）
+- 存储：控制台 + `./logs/ai-writer.log`（保留 30 天）+ `./logs/ai-writer-error.log`（保留 60 天）
 
 ## 测试策略
 
-- 后端：JUnit + Mockito 单元测试，MockMvc 集成测试，AI 层用 mock 响应
-- 前端：Vitest 组件/Store 测试，MSW 模拟 API，Playwright E2E 覆盖核心路径
+- 后端：JUnit + Mockito 单元测试，MockMvc 集成测试，AI 层用 mock 响应 **（待实施）**
+- 前端：Vitest 组件/Store 测试，MSW 模拟 API，Playwright E2E 覆盖核心路径 **（待实施）**
 
 ## 路由设计
 
@@ -158,3 +186,17 @@ MySQL (users, projects, documents, style_templates, source_materials, learning_j
 | `/project/:id` | WorkspaceView | 工作区 |
 | `/project/:id/doc/:docId` | WorkspaceView | 编辑文档 |
 | `/styles` | StyleManageView | 风格管理 |
+
+## 版本记录
+
+| 日期 | 版本 | 变更 |
+|------|------|------|
+| 2026-05-04 | 0.1.2 | 测试：JWT/认证/文档/项目 4 个 Service 共 32 个单元测试，CI/CD GitHub Actions |
+| 2026-05-04 | 0.1.1 | 安全加固：JWT 密钥环境变量化、异常分类处理（401/403/404）、日志体系建立、前端 401 循环修复 |
+| 2026-05-03 | 0.1.0 | 项目初始化，MVP 功能完成 |
+
+## 相关文档
+
+- [运维文档](../operations.md) — 部署、环境变量、日志、架构决策记录
+- [技术债务](../tech-debt.md) — 已知问题和修复计划
+- [ADR-001: WebClient vs Spring AI](../adr/001-webclient-vs-spring-ai.md)

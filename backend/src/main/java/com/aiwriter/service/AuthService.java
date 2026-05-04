@@ -3,10 +3,13 @@ package com.aiwriter.service;
 import com.aiwriter.dto.request.LoginRequest;
 import com.aiwriter.dto.request.RegisterRequest;
 import com.aiwriter.dto.response.AuthResponse;
+import com.aiwriter.exception.AuthException;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.UserRepository;
 import com.aiwriter.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,16 +17,17 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private final UserRepository userRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
 
     public AuthResponse register(RegisterRequest req) {
         if (userRepo.existsByEmail(req.getEmail())) {
-            throw new RuntimeException("邮箱已被注册");
+            throw new IllegalArgumentException("邮箱已被注册");
         }
         if (userRepo.existsByUsername(req.getUsername())) {
-            throw new RuntimeException("用户名已被使用");
+            throw new IllegalArgumentException("用户名已被使用");
         }
 
         User user = User.builder()
@@ -34,6 +38,7 @@ public class AuthService {
                 .build();
         user = userRepo.save(user);
 
+        log.info("用户注册: id={}, username={}, email={}", user.getId(), user.getUsername(), user.getEmail());
         return buildAuthResponse(user);
     }
 
@@ -41,22 +46,27 @@ public class AuthService {
         User user = userRepo.findByEmail(req.getAccount())
                 .or(() -> userRepo.findByUsername(req.getAccount()))
                 .or(() -> userRepo.findByPhone(req.getAccount()))
-                .orElseThrow(() -> new RuntimeException("账号不存在"));
+                .orElseThrow(() -> {
+                    log.warn("登录失败: 账号不存在 account={}", req.getAccount());
+                    return new AuthException("账号不存在");
+                });
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("密码错误");
+            log.warn("登录失败: 密码错误 userId={}, username={}", user.getId(), user.getUsername());
+            throw new AuthException("密码错误");
         }
 
+        log.info("用户登录: userId={}, username={}", user.getId(), user.getUsername());
         return buildAuthResponse(user);
     }
 
     public AuthResponse refresh(String refreshToken) {
         if (!tokenProvider.validateToken(refreshToken)) {
-            throw new RuntimeException("刷新令牌无效或已过期");
+            throw new AuthException("刷新令牌无效或已过期");
         }
         Long userId = tokenProvider.getUserIdFromToken(refreshToken);
         User user = userRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+                .orElseThrow(() -> new AuthException("用户不存在"));
         return buildAuthResponse(user);
     }
 

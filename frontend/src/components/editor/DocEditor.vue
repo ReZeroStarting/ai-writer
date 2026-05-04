@@ -24,11 +24,19 @@ const content = ref('')
 
 const doc = computed(() => store.currentDoc)
 
-const plainText = computed(() => {
-  const div = document.createElement('div')
-  div.innerHTML = content.value
-  return div.textContent || ''
-})
+let htmlToText: (html: string) => string
+function getHtmlToText() {
+  if (!htmlToText) {
+    const el = document.createElement('div')
+    htmlToText = (html: string) => {
+      el.innerHTML = html
+      return el.textContent || ''
+    }
+  }
+  return htmlToText
+}
+
+const plainText = computed(() => getHtmlToText()(content.value))
 
 onMounted(async () => {
   await store.fetchOne(props.docId)
@@ -43,7 +51,7 @@ function autoSave() {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     store.save(props.docId, title.value, content.value)
-  }, 1000)
+  }, 3000)
 }
 
 watch([title, content], autoSave)

@@ -3,6 +3,8 @@ package com.aiwriter.service;
 import com.aiwriter.ai.StyleAnalyzer;
 import com.aiwriter.dto.request.LearnRequest;
 import com.aiwriter.dto.response.JobResponse;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +24,7 @@ public class LearningService {
     @Transactional
     public JobResponse startLearning(Long userId, Long templateId, LearnRequest req) {
         StyleTemplate template = styleRepo.findById(templateId)
-                .orElseThrow(() -> new RuntimeException("风格模板不存在"));
+                .orElseThrow(() -> new NotFoundException("风格模板不存在"));
 
         SourceMaterial material = SourceMaterial.builder()
                 .user(User.builder().id(userId).build()).template(template)
@@ -64,9 +66,9 @@ public class LearningService {
     }
 
     public JobResponse getJob(Long userId, Long id) {
-        LearningJob j = jobRepo.findById(id).orElseThrow(() -> new RuntimeException("任务不存在"));
+        LearningJob j = jobRepo.findById(id).orElseThrow(() -> new NotFoundException("任务不存在"));
         if (!j.getUser().getId().equals(userId))
-            throw new RuntimeException("无权查看此任务");
+            throw new ForbiddenException("无权查看此任务");
         return toResponse(j);
     }
 

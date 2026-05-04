@@ -2,6 +2,8 @@ package com.aiwriter.service;
 
 import com.aiwriter.dto.request.StyleRequest;
 import com.aiwriter.dto.response.StyleResponse;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.StyleTemplate;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.StyleTemplateRepository;
@@ -43,9 +45,9 @@ public class StyleService {
 
     private StyleTemplate findOwned(Long userId, Long id) {
         StyleTemplate st = styleRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("风格模板不存在"));
+                .orElseThrow(() -> new NotFoundException("风格模板不存在"));
         if (!st.getUser().getId().equals(userId))
-            throw new RuntimeException("无权操作此模板");
+            throw new ForbiddenException("无权操作此模板");
         return st;
     }
 

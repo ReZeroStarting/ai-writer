@@ -7,6 +7,8 @@ import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.DocumentRepository;
 import com.aiwriter.repository.ProjectRepository;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -24,7 +26,7 @@ public class DocumentService {
 
     public DocumentResponse create(Long userId, Long projectId, DocumentRequest req) {
         Project project = projectRepo.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
+                .orElseThrow(() -> new NotFoundException("项目不存在"));
         Document doc = Document.builder()
                 .project(project).user(User.builder().id(userId).build())
                 .title(req.getTitle()).content(req.getContent() != null ? req.getContent() : "")
@@ -49,9 +51,9 @@ public class DocumentService {
 
     private Document findOwned(Long userId, Long docId) {
         Document doc = docRepo.findById(docId)
-                .orElseThrow(() -> new RuntimeException("文档不存在"));
+                .orElseThrow(() -> new NotFoundException("文档不存在"));
         if (!doc.getUser().getId().equals(userId))
-            throw new RuntimeException("无权操作此文档");
+            throw new ForbiddenException("无权操作此文档");
         return doc;
     }
 

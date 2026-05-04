@@ -5,9 +5,9 @@ spring:
   application:
     name: ai-writer
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_writer?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&createDatabaseIfNotExist=true
-    username: root
-    password: ${MYSQL_PASSWORD:root}
+    url: jdbc:mysql://localhost:3306/ai_writer?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -25,6 +25,6 @@ anthropic:
   max-tokens: 4096
 
 jwt:
-  secret: ${JWT_SECRET:ai-writer-jwt-secret-key-2026-please-change-in-production}
+  secret: ${JWT_SECRET:}
   access-token-expiration: 1800000
   refresh-token-expiration: 604800000

@@ -2,6 +2,8 @@ package com.aiwriter.service;
 
 import com.aiwriter.dto.request.ProjectRequest;
 import com.aiwriter.dto.response.ProjectResponse;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.ProjectRepository;
@@ -41,9 +43,9 @@ public class ProjectService {
 
     private Project findOwned(Long userId, Long projectId) {
         Project p = projectRepo.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
+                .orElseThrow(() -> new NotFoundException("项目不存在"));
         if (!p.getUser().getId().equals(userId))
-            throw new RuntimeException("无权操作此项目");
+            throw new ForbiddenException("无权操作此项目");
         return p;
     }
 

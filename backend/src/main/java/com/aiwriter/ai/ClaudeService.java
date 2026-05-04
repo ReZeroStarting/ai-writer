@@ -2,6 +2,8 @@ package com.aiwriter.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.util.Map;
 
 @Service
 public class ClaudeService {
+    private static final Logger log = LoggerFactory.getLogger(ClaudeService.class);
     private final WebClient webClient;
     private final String model;
     private final double temperature;
@@ -83,7 +86,8 @@ public class ClaudeService {
                     return delta.get("text").asText();
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("解析SSE delta失败: {}", json, e);
         }
         return "";
     }
@@ -100,7 +104,8 @@ public class ClaudeService {
                 }
                 return sb.toString();
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("解析Claude响应失败: {}", json, e);
         }
         return "";
     }
