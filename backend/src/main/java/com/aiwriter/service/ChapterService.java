@@ -31,7 +31,7 @@ public class ChapterService {
                 .elementSnapshot(toJson(snapshot))
                 .status(Chapter.ChapterStatus.DRAFT)
                 .build();
-        chapterRepo.save(ch);
+        ch = chapterRepo.save(ch);
 
         eventService.appendEventInternal(fw, WritingEvent.EventType.CHAPTER_STARTED,
                 Map.of("chapterId", ch.getId(), "chapterIndex", chapterIndex, "elementSnapshot", snapshot));

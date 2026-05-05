@@ -35,8 +35,7 @@ public class FrameworkService {
                 .user(User.builder().id(userId).build())
                 .status(Framework.FrameworkStatus.ACTIVE)
                 .build();
-        frameworkRepo.save(fw);
-        return toResponse(fw);
+        return toResponse(frameworkRepo.save(fw));
     }
 
     public FrameworkResponse getFramework(Long userId, Long frameworkId) {

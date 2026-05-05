@@ -34,8 +34,7 @@ public class ElementService {
                 .user(User.builder().id(userId).build())
                 .type(req.getType()).name(req.getName()).content(req.getContent())
                 .isDeprecated(false).build();
-        elementRepo.save(el);
-        return toResponse(el);
+        return toResponse(elementRepo.save(el));
     }
 
     public ElementResponse update(Long userId, Long frameworkId, String elementId, FrameworkElementRequest req) {
@@ -49,8 +48,7 @@ public class ElementService {
                 .user(User.builder().id(userId).build())
                 .type(req.getType()).name(req.getName()).content(req.getContent())
                 .isDeprecated(false).build();
-        elementRepo.save(el);
-        return toResponse(el);
+        return toResponse(elementRepo.save(el));
     }
 
     public void delete(Long userId, Long frameworkId, String elementId) {
@@ -104,8 +102,7 @@ public class ElementService {
                         .user(User.builder().id(userId).build())
                         .type(type).name(map.get("name")).content(map.get("content"))
                         .isDeprecated(false).build();
-                elementRepo.save(el);
-                results.add(toResponse(el));
+                results.add(toResponse(elementRepo.save(el)));
             }
             return results;
         } catch (Exception e) {
@@ -115,8 +112,7 @@ public class ElementService {
                     .user(User.builder().id(userId).build())
                     .type(type).name("AI 生成").content(response)
                     .isDeprecated(false).build();
-            elementRepo.save(el);
-            return List.of(toResponse(el));
+            return List.of(toResponse(elementRepo.save(el)));
         }
     }
 

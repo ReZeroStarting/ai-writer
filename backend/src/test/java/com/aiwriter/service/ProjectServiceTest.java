@@ -6,6 +6,7 @@ import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.DocumentRepository;
 import com.aiwriter.repository.ProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.*;
 class ProjectServiceTest {
 
     @Mock private ProjectRepository projectRepo;
+    @Mock private DocumentRepository docRepo;
     @InjectMocks private ProjectService projectService;
 
     private User owner;
