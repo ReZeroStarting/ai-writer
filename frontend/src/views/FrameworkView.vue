@@ -55,6 +55,9 @@
           <el-badge v-if="(fw?.unresolvedConflictCount ?? 0) > 0" :value="fw?.unresolvedConflictCount" style="margin-left: 8px" />
         </el-menu-item>
         <el-menu-item index="framework-history">历史事件</el-menu-item>
+        <el-menu-item index="framework-tutorial">
+          <el-icon><QuestionFilled /></el-icon>使用教程
+        </el-menu-item>
       </el-menu>
     </el-card>
 
@@ -68,6 +71,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFrameworkStore } from '@/stores/framework'
 import { frameworkApi } from '@/api/framework'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

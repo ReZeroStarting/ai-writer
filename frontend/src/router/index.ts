@@ -32,6 +32,7 @@ const router = createRouter({
             { path: 'write', name: 'framework-write', component: () => import('@/views/WriteView.vue') },
             { path: 'conflicts', name: 'framework-conflicts', component: () => import('@/views/ConflictsView.vue') },
             { path: 'history', name: 'framework-history', component: () => import('@/views/HistoryView.vue') },
+            { path: 'tutorial', name: 'framework-tutorial', component: () => import('@/views/TutorialView.vue') },
           ],
         },
       ],
