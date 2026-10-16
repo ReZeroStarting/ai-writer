@@ -61,7 +61,8 @@ public class AuthService {
     }
 
     public AuthResponse refresh(String refreshToken) {
-        if (!tokenProvider.validateToken(refreshToken)) {
+        // 必须是 refresh token，拿 access token 来刷新将被拒绝
+        if (!tokenProvider.validateRefreshToken(refreshToken)) {
             throw new AuthException("刷新令牌无效或已过期");
         }
         Long userId = tokenProvider.getUserIdFromToken(refreshToken);

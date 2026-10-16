@@ -1,5 +1,6 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.exception.UpstreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -51,18 +52,50 @@ public class ClaudeService {
                 .map(line -> line.substring(6))
                 .filter(data -> !"[DONE]".equals(data.trim()))
                 .map(this::extractDeltaText)
-                .filter(text -> text != null && !text.isEmpty());
+                .filter(text -> text != null && !text.isEmpty())
+                // 上游（Anthropic）报错时，不要以 500 中断连接——把可读原因作为一条流式消息推给前端，
+                // 用户才能知道是「API Key 未配置/无效」还是「额度/网络」问题，而不是笼统的"服务器内部错误"。
+                .onErrorResume(err -> {
+                    log.error("AI 上游调用失败: {}", err.getMessage());
+                    return Flux.just(describeUpstreamError(err));
+                });
+    }
+
+    /** 把上游异常翻译成用户可读的一句话说明。 */
+    private String describeUpstreamError(Throwable err) {
+        String msg = String.valueOf(err.getMessage());
+        if (msg.contains("401") || msg.contains("403")) {
+            return "【AI 服务未授权】请检查后端配置的 ANTHROPIC_API_KEY 是否有效。";
+        }
+        if (msg.contains("429")) {
+            return "【AI 服务限流】请求过于频繁或额度不足，请稍后再试。";
+        }
+        if (msg.contains("500") || msg.contains("502") || msg.contains("503")) {
+            return "【AI 服务暂时不可用】上游返回错误，请稍后再试。";
+        }
+        if (msg.contains("UnknownHost") || msg.contains("Connection") || msg.contains("timeout")) {
+            return "【网络异常】无法连接 AI 服务，请检查网络或代理设置。";
+        }
+        return "【AI 调用失败】" + msg;
     }
 
     public String complete(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildRequestBody(systemPrompt, userPrompt, false);
-        String response = webClient.post()
-                .uri("/v1/messages")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+        String response;
+        try {
+            response = webClient.post()
+                    .uri("/v1/messages")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception err) {
+            // 与 stream() 保持一致：上游失败时给出可读原因并映射为 502，
+            // 而不是把 NPE/WebClientException 直接抛成 500「服务器内部错误」。
+            log.error("AI 上游调用失败(complete): {}", err.getMessage());
+            throw new UpstreamException(describeUpstreamError(err));
+        }
         return extractContentText(response);
     }
 
