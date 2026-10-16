@@ -72,4 +72,24 @@ class JwtTokenProviderTest {
         assertFalse(p2.validateToken(token));
     }
 
-  }
+    // ---- token 类型混淆防护（2026-10-16 修复）----
+
+    @Test
+    void accessTokenShouldPassAccessValidationOnly() {
+        JwtTokenProvider p = provider();
+        String access = p.generateAccessToken(1L, "user");
+
+        assertTrue(p.validateAccessToken(access), "access token 应通过 access 校验");
+        assertFalse(p.validateRefreshToken(access), "access token 不应通过 refresh 校验");
+    }
+
+    @Test
+    void refreshTokenShouldPassRefreshValidationOnly() {
+        JwtTokenProvider p = provider();
+        String refresh = p.generateRefreshToken(1L);
+
+        assertTrue(p.validateRefreshToken(refresh), "refresh token 应通过 refresh 校验");
+        assertFalse(p.validateAccessToken(refresh), "refresh token 不应通过 access 校验（防双向冒用）");
+    }
+
+}

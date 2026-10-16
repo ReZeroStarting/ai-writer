@@ -6,8 +6,14 @@ import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.ChapterRepository;
+import com.aiwriter.repository.ConflictRepository;
 import com.aiwriter.repository.DocumentRepository;
+import com.aiwriter.repository.FrameworkElementRepository;
+import com.aiwriter.repository.FrameworkRepository;
+import com.aiwriter.repository.PatchRepository;
 import com.aiwriter.repository.ProjectRepository;
+import com.aiwriter.repository.WritingEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +27,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +35,12 @@ class ProjectServiceTest {
 
     @Mock private ProjectRepository projectRepo;
     @Mock private DocumentRepository docRepo;
+    @Mock private FrameworkRepository frameworkRepo;
+    @Mock private ChapterRepository chapterRepo;
+    @Mock private ConflictRepository conflictRepo;
+    @Mock private PatchRepository patchRepo;
+    @Mock private FrameworkElementRepository elementRepo;
+    @Mock private WritingEventRepository eventRepo;
     @InjectMocks private ProjectService projectService;
 
     private User owner;
@@ -107,10 +120,12 @@ class ProjectServiceTest {
     @Test
     void shouldDeleteOwnedProject() {
         when(projectRepo.findById(10L)).thenReturn(Optional.of(project));
+        when(frameworkRepo.findByProjectId(10L)).thenReturn(Optional.empty());
 
         projectService.delete(1L, 10L);
 
         verify(projectRepo).deleteById(10L);
+        verify(docRepo).deleteByProjectId(10L);
     }
 
     @Test
@@ -120,6 +135,32 @@ class ProjectServiceTest {
         assertThrows(ForbiddenException.class,
                 () -> projectService.delete(2L, 10L));
         verify(projectRepo, never()).deleteById(anyLong());
+    }
+
+    /** 框架模式项目：删除时必须按依赖顺序级联清理，否则 FK 冲突 500。 */
+    @Test
+    void shouldDeleteFrameworkModeProjectCascade() {
+        com.aiwriter.model.Framework fw = com.aiwriter.model.Framework.builder()
+                .id(77L).project(project).status(com.aiwriter.model.Framework.FrameworkStatus.ACTIVE).build();
+        com.aiwriter.model.Conflict c1 = com.aiwriter.model.Conflict.builder().id(501L).build();
+        com.aiwriter.model.Conflict c2 = com.aiwriter.model.Conflict.builder().id(502L).build();
+
+        when(projectRepo.findById(10L)).thenReturn(Optional.of(project));
+        when(frameworkRepo.findByProjectId(10L)).thenReturn(Optional.of(fw));
+        when(conflictRepo.findByFrameworkIdOrderByCreatedAtDesc(77L)).thenReturn(List.of(c1, c2));
+
+        projectService.delete(1L, 10L);
+
+        // 补丁必须在冲突之前删
+        verify(patchRepo).deleteByConflictId(501L);
+        verify(patchRepo).deleteByConflictId(502L);
+        verify(conflictRepo).deleteByFrameworkId(77L);
+        verify(chapterRepo).deleteByFrameworkId(77L);
+        verify(elementRepo).deleteByFrameworkId(77L);
+        verify(eventRepo).deleteByFrameworkId(77L);
+        verify(frameworkRepo).deleteById(77L);
+        verify(docRepo).deleteByProjectId(10L);
+        verify(projectRepo).deleteById(10L);
     }
 
     @Test

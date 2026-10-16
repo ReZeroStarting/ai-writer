@@ -10,3 +10,6 @@ target/
 *.iml
 dist/
 tsconfig.tsbuildinfo
+
+# 本机专属 profile（含数据库口令），禁止提交
+backend/src/main/resources/application-local.yml

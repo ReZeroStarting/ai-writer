@@ -136,7 +136,7 @@ class AuthServiceTest {
 
     @Test
     void shouldRefreshToken() {
-        when(tokenProvider.validateToken("refresh-token")).thenReturn(true);
+        when(tokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
         when(tokenProvider.getUserIdFromToken("refresh-token")).thenReturn(1L);
         when(userRepo.findById(1L)).thenReturn(Optional.of(savedUser));
 
@@ -148,8 +148,16 @@ class AuthServiceTest {
 
     @Test
     void shouldRejectInvalidRefreshToken() {
-        when(tokenProvider.validateToken("bad-token")).thenReturn(false);
+        when(tokenProvider.validateRefreshToken("bad-token")).thenReturn(false);
 
         assertThrows(AuthException.class, () -> authService.refresh("bad-token"));
+    }
+
+    /** 用 access token 冒充 refresh token 刷新，必须被拒绝。 */
+    @Test
+    void shouldRejectAccessTokenUsedAsRefresh() {
+        when(tokenProvider.validateRefreshToken("access-token")).thenReturn(false);
+
+        assertThrows(AuthException.class, () -> authService.refresh("access-token"));
     }
 }

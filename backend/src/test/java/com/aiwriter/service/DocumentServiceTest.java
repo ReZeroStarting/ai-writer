@@ -7,7 +7,10 @@ import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Document;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.ChapterRepository;
+import com.aiwriter.repository.ConflictRepository;
 import com.aiwriter.repository.DocumentRepository;
+import com.aiwriter.repository.PatchRepository;
 import com.aiwriter.repository.ProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +33,9 @@ class DocumentServiceTest {
 
     @Mock private DocumentRepository docRepo;
     @Mock private ProjectRepository projectRepo;
+    @Mock private ChapterRepository chapterRepo;
+    @Mock private ConflictRepository conflictRepo;
+    @Mock private PatchRepository patchRepo;
     @InjectMocks private DocumentService documentService;
 
     private User owner;
@@ -113,9 +120,11 @@ class DocumentServiceTest {
     @Test
     void shouldDeleteOwnedDocument() {
         when(docRepo.findById(100L)).thenReturn(Optional.of(document));
+        when(chapterRepo.findByDocumentId(100L)).thenReturn(List.of());
 
         documentService.delete(1L, 100L);
 
+        verify(chapterRepo).deleteByDocumentId(100L);
         verify(docRepo).deleteById(100L);
     }
 
@@ -129,6 +138,7 @@ class DocumentServiceTest {
 
     @Test
     void shouldListDocumentsByProject() {
+        when(projectRepo.findById(10L)).thenReturn(Optional.of(project));
         when(docRepo.findByProjectIdOrderByUpdatedAtDesc(10L))
                 .thenReturn(List.of(document));
 
@@ -136,5 +146,24 @@ class DocumentServiceTest {
 
         assertEquals(1, list.size());
         assertEquals("Test Doc", list.get(0).getTitle());
+    }
+
+    /** 越权回归：不能往他人项目插入章节。 */
+    @Test
+    void shouldRejectCreateInOthersProject() {
+        when(projectRepo.findById(10L)).thenReturn(Optional.of(project));
+
+        assertThrows(ForbiddenException.class,
+                () -> documentService.create(2L, 10L, new DocumentRequest()));
+        verify(docRepo, never()).save(any(Document.class));
+    }
+
+    /** 越权回归：不能读取他人项目的章节列表。 */
+    @Test
+    void shouldRejectListOthersProject() {
+        when(projectRepo.findById(10L)).thenReturn(Optional.of(project));
+
+        assertThrows(ForbiddenException.class,
+                () -> documentService.listByProject(2L, 10L));
     }
 }

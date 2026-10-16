@@ -150,6 +150,8 @@ class ElementServiceTest {
                 .user(User.builder().id(1L).build())
                 .type("character").name("张三").content("主角，26岁剑客").isDeprecated(false)
                 .createdAt(LocalDateTime.now()).build();
+        // 归属校验需要：取最新版本确认元素属于本框架
+        when(elementRepo.findLatestByElementId("abc-123")).thenReturn(Optional.of(element));
         when(elementRepo.findVersionsByElementId("abc-123")).thenReturn(List.of(element, v2));
 
         List<ElementResponse> versions = elementService.getVersions(1L, 100L, "abc-123");
@@ -157,6 +159,41 @@ class ElementServiceTest {
         assertEquals(2, versions.size());
         assertEquals(1, versions.get(0).getVersion());
         assertEquals(2, versions.get(1).getVersion());
+    }
+
+    @Test
+    void shouldRejectGetVersionsForElementOfAnotherFramework() {
+        // 交叉越权：我的框架（100）+ 他人的元素 → 必须 403，而不是读到内容
+        Framework other = Framework.builder().id(999L)
+                .user(User.builder().id(2L).build()).build();
+        FrameworkElement foreign = FrameworkElement.builder()
+                .id("foreign-1").version(1).framework(other)
+                .user(User.builder().id(2L).build())
+                .type("character").name("他人的机密").content("SECRET")
+                .isDeprecated(false).createdAt(LocalDateTime.now()).build();
+        when(frameworkService.findOwned(1L, 100L)).thenReturn(framework);
+        when(elementRepo.findLatestByElementId("foreign-1")).thenReturn(Optional.of(foreign));
+
+        assertThrows(ForbiddenException.class,
+                () -> elementService.getVersions(1L, 100L, "foreign-1"));
+        verify(elementRepo, never()).findVersionsByElementId(anyString());
+    }
+
+    @Test
+    void shouldRejectDeleteForElementOfAnotherFramework() {
+        Framework other = Framework.builder().id(999L)
+                .user(User.builder().id(2L).build()).build();
+        FrameworkElement foreign = FrameworkElement.builder()
+                .id("foreign-1").version(1).framework(other)
+                .user(User.builder().id(2L).build())
+                .type("character").name("他人的机密").content("SECRET")
+                .isDeprecated(false).createdAt(LocalDateTime.now()).build();
+        when(frameworkService.findOwned(1L, 100L)).thenReturn(framework);
+        when(elementRepo.findLatestByElementId("foreign-1")).thenReturn(Optional.of(foreign));
+
+        assertThrows(ForbiddenException.class,
+                () -> elementService.delete(1L, 100L, "foreign-1"));
+        verify(elementRepo, never()).save(any(FrameworkElement.class));
     }
 
     @Test
