@@ -1,10 +1,10 @@
 # AI Writer
 
-全栈 AI 写作助手 —— 集成 Anthropic Claude 的多用户写作平台。
+全栈 AI 写作助手 —— 支持 Anthropic Claude / DeepSeek 双上游的多用户写作平台。
 
 除了常规的 AI 写作辅助（大纲、续写、润色、扩写、缩写），AI Writer 提供两项差异化能力：
 
-- **AI 风格学习**：上传小说 / 文本素材，让 Claude 提炼其中的写作风格与文笔，生成可复用的风格模板，写作时一键注入。
+- **AI 风格学习**：上传小说 / 文本素材，让 AI 提炼其中的写作风格与文笔，生成可复用的风格模板，写作时一键注入。
 - **小说写作框架引擎**：以事件流架构管理长篇创作的设定体系，支持设定版本化、上下文驱动续写、冲突自动检测与回退溯源。
 
 ## 功能特性
@@ -21,10 +21,10 @@
 ### 小说写作框架引擎
 - **框架模式**：项目可升级为框架模式（不可逆），统一管理角色、地点、物品、组织、事件、世界观等设定元素，支持自定义类型
 - **版本化元素**：修改即追加新版本而非覆盖，可查看完整版本历史，章节记录生成时引用的版本快照
-- **AI 辅助设定**：由 Claude 生成设定元素，注入已有元素上下文避免自相矛盾
+- **AI 辅助设定**：由 AI 生成设定元素，注入已有元素上下文避免自相矛盾
 - **无限续写**：AI 基于「全部设定 + 当前章 + 前章 + 历史摘要」四层上下文持续写作，用户不喊停就不停
 - **随时介入**：写作过程中可插入内容或指令，AI 以最新上下文继续
-- **冲突检测**：写后由 Claude 对照最新设定做一致性审查，大冲突挂起待处理、小冲突自动打补丁，冲突可忽略 / 打补丁 / 重写章节
+- **冲突检测**：写后由 AI 对照最新设定做一致性审查，大冲突挂起待处理、小冲突自动打补丁，冲突可忽略 / 打补丁 / 重写章节
 - **事件流溯源**：所有创作操作记为不可变事件，支持时间轴回溯与任意时间点的框架状态重建
 
 ## 技术栈
@@ -34,7 +34,7 @@
 | 前端 | Vue 3.5 · Vite 6 · TypeScript · Element Plus 2 · Tiptap 2 · Pinia · Vue Router 4 |
 | 后端 | Java 17 · Spring Boot 3.5 · Spring Security · Spring Data JPA · WebClient |
 | 数据库 | MySQL 8（JPA `ddl-auto: update` 自动建表） |
-| AI | Anthropic Claude Messages API（WebClient 裸调，SSE 流式） |
+| AI | Anthropic Messages API / DeepSeek OpenAI 兼容协议（WebClient 裸调，SSE 流式），可由 `AI_PROVIDER` 切换 |
 | 鉴权 | JWT（jjwt 0.12.6）+ BCrypt |
 | 日志 | SLF4J + Logback + AOP 请求切面 |
 | 测试 | JUnit 5 + Mockito（后端）/ Vitest + @vue/test-utils（前端） |
@@ -51,7 +51,7 @@ ai-writer/
 │   │   ├── config/              # SecurityConfig 等
 │   │   ├── controller/          # REST 端点（auth / project / document / ai / style / framework ...）
 │   │   ├── service/             # 业务逻辑（含 ContextBuilder / NovelWriteService / ConflictService）
-│   │   ├── ai/                  # ClaudeService、PromptBuilder、StyleAnalyzer
+│   │   ├── ai/                  # AiProvider 及实现（ClaudeService / DeepSeekService）、PromptBuilder、StyleAnalyzer
 │   │   ├── model/               # JPA 实体
 │   │   ├── repository/          # Spring Data JPA
 │   │   ├── security/            # JWT Filter / Provider
@@ -91,7 +91,9 @@ CREATE DATABASE ai_writer DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_
 
 | 变量 | 必须 | 默认值 | 说明 |
 |------|------|--------|------|
-| `ANTHROPIC_API_KEY` | 是 | 无 | Claude API 密钥，[获取地址](https://console.anthropic.com) |
+| `AI_PROVIDER` | 否 | `anthropic` | AI 上游选择：`anthropic` 或 `deepseek` |
+| `ANTHROPIC_API_KEY` | 视情况 | 无 | Claude API 密钥，[获取地址](https://console.anthropic.com)。`AI_PROVIDER=anthropic`（默认）时必填 |
+| `DEEPSEEK_API_KEY` | 视情况 | 无 | DeepSeek API 密钥，[获取地址](https://platform.deepseek.com/api_keys)。`AI_PROVIDER=deepseek` 时必填 |
 | `JWT_SECRET` | 是 | 无 | JWT 签名密钥，256 位以上随机串，**未设置则启动失败** |
 | `MYSQL_PASSWORD` | 是 | 无 | 数据库密码 |
 | `MYSQL_USER` | 否 | `root` | 数据库用户名 |
@@ -102,6 +104,28 @@ CREATE DATABASE ai_writer DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_
 ```bash
 openssl rand -base64 32
 ```
+
+### 2.1 选择 AI 上游
+
+项目同时支持两家 provider，通过 `AI_PROVIDER` 切换，二者协议不同但上层接口一致：
+
+| provider | 协议 | 端点 | 鉴权 | 默认模型 |
+|---|---|---|---|---|
+| `anthropic`（默认） | Anthropic Messages API | `/v1/messages` | `x-api-key` | `claude-sonnet-4-6` |
+| `deepseek` | OpenAI 兼容协议 | `/chat/completions` | `Bearer` | `deepseek-flash` |
+
+不设置 `AI_PROVIDER` 时行为与改造前完全一致（走 Anthropic）。
+
+用 DeepSeek：
+
+```bash
+# Linux / macOS
+AI_PROVIDER=deepseek DEEPSEEK_API_KEY=sk-xxx JWT_SECRET=xxx MYSQL_PASSWORD=xxx mvn spring-boot:run
+# Windows PowerShell
+$env:AI_PROVIDER="deepseek"; $env:DEEPSEEK_API_KEY="sk-xxx"; $env:JWT_SECRET="xxx"; $env:MYSQL_PASSWORD="xxx"; mvn spring-boot:run
+```
+
+模型与端点可在 `application.yml` 的 `deepseek.*` / `anthropic.*` 段调整（也可用同名环境变量覆盖）。
 
 ### 3. 启动后端
 

@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.ClaudeService;
+import com.aiwriter.ai.AiProvider;
 import com.aiwriter.ai.PromptBuilder;
 import com.aiwriter.dto.request.AiRequest;
 import com.aiwriter.exception.ForbiddenException;
@@ -33,7 +33,8 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AiServiceTest {
 
-    @Mock private ClaudeService claude;
+    // 依赖接口而非具体 provider，测试与具体实现（Anthropic/DeepSeek）解耦
+    @Mock private AiProvider claude;
     @Mock private StyleTemplateRepository styleRepo;
 
     private AiService aiService;

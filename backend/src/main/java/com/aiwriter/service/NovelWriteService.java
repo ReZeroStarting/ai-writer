@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.ClaudeService;
+import com.aiwriter.ai.AiProvider;
 import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 @Service
 @RequiredArgsConstructor
 public class NovelWriteService {
-    private final ClaudeService claudeService;
+    private final AiProvider claudeService;
     private final ContextBuilder contextBuilder;
     private final ChapterService chapterService;
     private final ConflictService conflictService;

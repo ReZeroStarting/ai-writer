@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -13,9 +14,17 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Anthropic（Claude）Messages API 实现。
+ *
+ * <p>当 <code>ai.provider=anthropic</code>（缺省）时启用。
+ */
 @Service
-public class ClaudeService {
+@ConditionalOnProperty(name = "ai.provider", havingValue = "anthropic", matchIfMissing = true)
+public class ClaudeService implements AiProvider {
     private static final Logger log = LoggerFactory.getLogger(ClaudeService.class);
+    private static final String KEY_NAME = "ANTHROPIC_API_KEY";
+
     private final WebClient webClient;
     private final String model;
     private final double temperature;
@@ -38,6 +47,12 @@ public class ClaudeService {
                 .build();
     }
 
+    @Override
+    public String providerName() {
+        return "anthropic";
+    }
+
+    @Override
     public Flux<String> stream(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildRequestBody(systemPrompt, userPrompt, true);
         return webClient.post()
@@ -47,38 +62,18 @@ public class ClaudeService {
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .filter(line -> !line.isBlank())
-                .filter(line -> line.startsWith("data: "))
-                .map(line -> line.substring(6))
-                .filter(data -> !"[DONE]".equals(data.trim()))
+                // 与 DeepSeekService 同一处理：WebClient 可能已剥掉 "data: " 前缀，
+                // 也可能保留。写死 startsWith("data: ") 会在前者情况下滤光全部内容。
+                .map(SseLines::stripDataPrefix)
+                .filter(SseLines::isPayload)
                 .map(this::extractDeltaText)
                 .filter(text -> text != null && !text.isEmpty())
-                // 上游（Anthropic）报错时，不要以 500 中断连接——把可读原因作为一条流式消息推给前端，
-                // 用户才能知道是「API Key 未配置/无效」还是「额度/网络」问题，而不是笼统的"服务器内部错误"。
-                .onErrorResume(err -> {
-                    log.error("AI 上游调用失败: {}", err.getMessage());
-                    return Flux.just(describeUpstreamError(err));
-                });
+                // 上游报错时不要以 500 中断连接——把可读原因作为一条流式消息推给前端，
+                // 用户才能知道是「API Key 未配置/无效」还是「额度/网络」问题。
+                .onErrorResume(err -> Flux.just(UpstreamErrors.describe(err, KEY_NAME, providerName())));
     }
 
-    /** 把上游异常翻译成用户可读的一句话说明。 */
-    private String describeUpstreamError(Throwable err) {
-        String msg = String.valueOf(err.getMessage());
-        if (msg.contains("401") || msg.contains("403")) {
-            return "【AI 服务未授权】请检查后端配置的 ANTHROPIC_API_KEY 是否有效。";
-        }
-        if (msg.contains("429")) {
-            return "【AI 服务限流】请求过于频繁或额度不足，请稍后再试。";
-        }
-        if (msg.contains("500") || msg.contains("502") || msg.contains("503")) {
-            return "【AI 服务暂时不可用】上游返回错误，请稍后再试。";
-        }
-        if (msg.contains("UnknownHost") || msg.contains("Connection") || msg.contains("timeout")) {
-            return "【网络异常】无法连接 AI 服务，请检查网络或代理设置。";
-        }
-        return "【AI 调用失败】" + msg;
-    }
-
+    @Override
     public String complete(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildRequestBody(systemPrompt, userPrompt, false);
         String response;
@@ -93,8 +88,7 @@ public class ClaudeService {
         } catch (Exception err) {
             // 与 stream() 保持一致：上游失败时给出可读原因并映射为 502，
             // 而不是把 NPE/WebClientException 直接抛成 500「服务器内部错误」。
-            log.error("AI 上游调用失败(complete): {}", err.getMessage());
-            throw new UpstreamException(describeUpstreamError(err));
+            throw new UpstreamException(UpstreamErrors.describe(err, KEY_NAME, providerName()));
         }
         return extractContentText(response);
     }

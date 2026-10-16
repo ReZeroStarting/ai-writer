@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class StyleAnalyzer {
-    private final ClaudeService claude;
+    private final AiProvider claude;
 
     public String analyzeStyle(String materialContent) {
         String systemPrompt = """

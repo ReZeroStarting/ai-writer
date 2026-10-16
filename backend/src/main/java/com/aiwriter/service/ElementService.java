@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.ClaudeService;
+import com.aiwriter.ai.AiProvider;
 import com.aiwriter.dto.request.AiGenerateElementsRequest;
 import com.aiwriter.dto.request.FrameworkElementRequest;
 import com.aiwriter.dto.response.ElementResponse;
@@ -18,7 +18,7 @@ import java.util.*;
 public class ElementService {
     private final FrameworkElementRepository elementRepo;
     private final FrameworkService frameworkService;
-    private final ClaudeService claudeService;
+    private final AiProvider claudeService;
 
     public List<ElementResponse> list(Long userId, Long frameworkId, String type) {
         frameworkService.findOwned(userId, frameworkId);

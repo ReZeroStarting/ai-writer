@@ -1,6 +1,7 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.ClaudeService;
+
+import com.aiwriter.ai.AiProvider;
 import com.aiwriter.ai.PromptBuilder;
 import com.aiwriter.dto.request.AiRequest;
 import com.aiwriter.exception.ForbiddenException;
@@ -17,7 +18,7 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
-    private final ClaudeService claude;
+    private final AiProvider claude;
     private final PromptBuilder prompts;
     private final StyleTemplateRepository styleRepo;
 
