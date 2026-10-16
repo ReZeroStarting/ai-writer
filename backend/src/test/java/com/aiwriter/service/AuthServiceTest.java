@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -91,6 +92,42 @@ class AuthServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
         verify(userRepo, never()).save(any());
+    }
+
+    /**
+     * 并发竞态：两个请求同时通过了 exists 检查，最终由数据库唯一索引拦下。
+     * 此时必须转成 400「邮箱已被注册」，而不是抛 500。
+     */
+    @Test
+    void shouldHandleConcurrentDuplicateEmailRace() {
+        when(userRepo.existsByEmail("test@example.com")).thenReturn(false);
+        when(userRepo.existsByUsername("testuser")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("hashed-password");
+        when(userRepo.save(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "could not execute statement",
+                        new RuntimeException("Duplicate entry 'test@example.com' for key 'users.UK_email'")));
+        // 竞态发生后再查，此时对方已落库
+        when(userRepo.existsByEmail("test@example.com")).thenReturn(false, true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.register(registerRequest));
+        assertEquals("邮箱已被注册", ex.getMessage());
+    }
+
+    /** 竞态兜底：用户名冲突也要落到正确的提示上。 */
+    @Test
+    void shouldHandleConcurrentDuplicateUsernameRace() {
+        when(userRepo.existsByEmail("test@example.com")).thenReturn(false);
+        when(userRepo.existsByUsername("testuser")).thenReturn(false, true);
+        when(passwordEncoder.encode("password123")).thenReturn("hashed-password");
+        when(userRepo.save(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate",
+                        new RuntimeException("Duplicate entry 'testuser' for key 'users.UK_username'")));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.register(registerRequest));
+        assertEquals("用户名已被使用", ex.getMessage());
     }
 
     @Test

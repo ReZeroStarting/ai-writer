@@ -10,6 +10,7 @@ import com.aiwriter.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
 
     public AuthResponse register(RegisterRequest req) {
+        // 前置检查：给出友好提示（覆盖绝大多数情况）
         if (userRepo.existsByEmail(req.getEmail())) {
             throw new IllegalArgumentException("邮箱已被注册");
         }
@@ -36,10 +38,36 @@ public class AuthService {
                 .phone(req.getPhone())
                 .passwordHash(passwordEncoder.encode(req.getPassword()))
                 .build();
-        user = userRepo.save(user);
+        try {
+            user = userRepo.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // 并发竞态兜底：两个请求同时通过了上面的 exists 检查，最终由数据库唯一索引拦下。
+            // 此时不能把异常抛成 500，而要按"已被注册"处理。
+            log.warn("并发注册被唯一索引拦下: email={}, username={}", req.getEmail(), req.getUsername());
+            throw new IllegalArgumentException(resolveDuplicateMessage(req, e));
+        }
 
         log.info("用户注册: id={}, username={}, email={}", user.getId(), user.getUsername(), user.getEmail());
         return buildAuthResponse(user);
+    }
+
+    /**
+     * 竞态兜底时判断到底是邮箱还是用户名冲突：优先以数据库中已存在的记录为准，
+     * 查不到再退回解析底层异常消息。
+     */
+    private String resolveDuplicateMessage(RegisterRequest req, DataIntegrityViolationException e) {
+        if (userRepo.existsByEmail(req.getEmail())) {
+            return "邮箱已被注册";
+        }
+        if (userRepo.existsByUsername(req.getUsername())) {
+            return "用户名已被使用";
+        }
+        String raw = e.getMostSpecificCause() != null
+                ? e.getMostSpecificCause().getMessage() : e.getMessage();
+        if (raw != null && raw.toLowerCase().contains("username")) {
+            return "用户名已被使用";
+        }
+        return "邮箱已被注册";
     }
 
     public AuthResponse login(LoginRequest req) {
