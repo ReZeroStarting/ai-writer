@@ -3,6 +3,8 @@ package com.aiwriter.service;
 import com.aiwriter.ai.ClaudeService;
 import com.aiwriter.ai.PromptBuilder;
 import com.aiwriter.dto.request.AiRequest;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.StyleTemplate;
 import com.aiwriter.repository.StyleTemplateRepository;
 import lombok.RequiredArgsConstructor;
@@ -73,12 +75,21 @@ public class AiService {
         return claude.stream(prompts.buildImitateSystem(style), msg);
     }
 
+    /**
+     * 解析风格模板的 systemPrompt。
+     *
+     * 三种情况必须区分对待，不能一律静默返回 null：
+     * - 未传 styleTemplateId：正常场景（用户没选风格），返回 null 即无风格生成；
+     * - 传了 id 但记录不存在：404，否则用户会以为"带了风格"，实际风格被悄悄丢掉；
+     * - 记录存在但不属于当前用户：403，避免把他人的 systemPrompt 读进生成上下文。
+     */
     private String getStylePrompt(Long id, Long userId) {
         if (id == null) return null;
-        // 必须校验风格模板归属：否则可传入他人 styleId，把他人的 systemPrompt 读进上下文。
-        return styleRepo.findById(id)
-                .filter(s -> s.getUser().getId().equals(userId))
-                .map(StyleTemplate::getSystemPrompt)
-                .orElse(null);
+        StyleTemplate template = styleRepo.findById(id)
+                .orElseThrow(() -> new NotFoundException("风格模板不存在: " + id));
+        if (!template.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("无权使用此风格模板");
+        }
+        return template.getSystemPrompt();
     }
 }
