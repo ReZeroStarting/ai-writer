@@ -7,4 +7,6 @@ import java.util.List;
 public interface ConflictRepository extends JpaRepository<Conflict, Long> {
     List<Conflict> findByFrameworkIdOrderByCreatedAtDesc(Long frameworkId);
     List<Conflict> findByChapterId(Long chapterId);
+    void deleteByFrameworkId(Long frameworkId);
+    void deleteByChapterId(Long chapterId);
 }

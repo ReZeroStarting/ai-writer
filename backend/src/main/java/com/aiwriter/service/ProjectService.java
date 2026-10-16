@@ -6,8 +6,14 @@ import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.ChapterRepository;
+import com.aiwriter.repository.ConflictRepository;
 import com.aiwriter.repository.DocumentRepository;
+import com.aiwriter.repository.FrameworkElementRepository;
+import com.aiwriter.repository.FrameworkRepository;
+import com.aiwriter.repository.PatchRepository;
 import com.aiwriter.repository.ProjectRepository;
+import com.aiwriter.repository.WritingEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +24,12 @@ import java.util.List;
 public class ProjectService {
     private final ProjectRepository projectRepo;
     private final DocumentRepository docRepo;
+    private final FrameworkRepository frameworkRepo;
+    private final ChapterRepository chapterRepo;
+    private final ConflictRepository conflictRepo;
+    private final PatchRepository patchRepo;
+    private final FrameworkElementRepository elementRepo;
+    private final WritingEventRepository eventRepo;
 
     public List<ProjectResponse> list(Long userId) {
         return projectRepo.findByUserIdOrderByUpdatedAtDesc(userId)
@@ -40,6 +52,23 @@ public class ProjectService {
     @Transactional
     public void delete(Long userId, Long projectId) {
         findOwned(userId, projectId);
+
+        // 按外键依赖从叶到根依次清理，避免 FK 约束冲突（框架模式项目曾因此 500）
+        frameworkRepo.findByProjectId(projectId).ifPresent(fw -> {
+            Long fwId = fw.getId();
+            // Patch → Conflict
+            conflictRepo.findByFrameworkIdOrderByCreatedAtDesc(fwId)
+                    .forEach(c -> patchRepo.deleteByConflictId(c.getId()));
+            conflictRepo.deleteByFrameworkId(fwId);
+            // Chapter（依赖 framework 与 document）
+            chapterRepo.deleteByFrameworkId(fwId);
+            // FrameworkElement / WritingEvent
+            elementRepo.deleteByFrameworkId(fwId);
+            eventRepo.deleteByFrameworkId(fwId);
+            // Framework 本体
+            frameworkRepo.deleteById(fwId);
+        });
+
         docRepo.deleteByProjectId(projectId);
         projectRepo.deleteById(projectId);
     }

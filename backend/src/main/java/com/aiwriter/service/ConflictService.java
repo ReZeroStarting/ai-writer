@@ -2,6 +2,7 @@ package com.aiwriter.service;
 
 import com.aiwriter.dto.request.ResolveConflictRequest;
 import com.aiwriter.dto.response.ConflictResponse;
+import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
@@ -31,6 +32,11 @@ public class ConflictService {
         frameworkService.findOwned(userId, frameworkId);
         Conflict c = conflictRepo.findById(conflictId)
                 .orElseThrow(() -> new NotFoundException("冲突不存在"));
+        // 交叉越权防护：先验框架归属后，还必须确认该冲突确实属于这个框架，
+        // 否则「我的框架 + 他人的 conflictId」可篡改他人冲突状态。
+        if (c.getFramework() == null || !frameworkId.equals(c.getFramework().getId())) {
+            throw new ForbiddenException("该冲突不属于指定框架");
+        }
 
         switch (req.getAction()) {
             case "ignore":
@@ -58,6 +64,12 @@ public class ConflictService {
 
     public List<Long> getImpactedChapters(Long userId, Long frameworkId, String elementId) {
         frameworkService.findOwned(userId, frameworkId);
+        // 元素必须属于该框架，否则会拿他人元素的版本号参与本框架计算（一致性 + 防御性）
+        elementRepo.findLatestByElementId(elementId).ifPresent(el -> {
+            if (el.getFramework() == null || !frameworkId.equals(el.getFramework().getId())) {
+                throw new ForbiddenException("该元素不属于指定框架");
+            }
+        });
         var latestVersion = elementRepo.findMaxVersionByElementId(elementId).orElse(1);
         return chapterRepo.findByFrameworkIdOrderByChapterIndexAsc(frameworkId).stream()
                 .filter(ch -> {

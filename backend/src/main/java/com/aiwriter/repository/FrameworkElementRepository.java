@@ -18,4 +18,6 @@ public interface FrameworkElementRepository extends JpaRepository<FrameworkEleme
 
     @Query("SELECT MAX(e.version) FROM FrameworkElement e WHERE e.id = :elementId")
     Optional<Integer> findMaxVersionByElementId(String elementId);
+
+    void deleteByFrameworkId(Long frameworkId);
 }

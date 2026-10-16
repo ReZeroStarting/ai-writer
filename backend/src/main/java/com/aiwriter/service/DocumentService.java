@@ -5,12 +5,16 @@ import com.aiwriter.dto.response.DocumentResponse;
 import com.aiwriter.model.Document;
 import com.aiwriter.model.Project;
 import com.aiwriter.model.User;
+import com.aiwriter.repository.ChapterRepository;
+import com.aiwriter.repository.ConflictRepository;
 import com.aiwriter.repository.DocumentRepository;
+import com.aiwriter.repository.PatchRepository;
 import com.aiwriter.repository.ProjectRepository;
 import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -18,15 +22,18 @@ import java.util.List;
 public class DocumentService {
     private final DocumentRepository docRepo;
     private final ProjectRepository projectRepo;
+    private final ChapterRepository chapterRepo;
+    private final ConflictRepository conflictRepo;
+    private final PatchRepository patchRepo;
 
     public List<DocumentResponse> listByProject(Long userId, Long projectId) {
+        findOwnedProject(userId, projectId);
         return docRepo.findByProjectIdOrderByUpdatedAtDesc(projectId)
                 .stream().map(this::toResponse).toList();
     }
 
     public DocumentResponse create(Long userId, Long projectId, DocumentRequest req) {
-        Project project = projectRepo.findById(projectId)
-                .orElseThrow(() -> new NotFoundException("项目不存在"));
+        Project project = findOwnedProject(userId, projectId);
         Document doc = Document.builder()
                 .project(project).user(User.builder().id(userId).build())
                 .title(req.getTitle()).content(req.getContent() != null ? req.getContent() : "")
@@ -44,8 +51,16 @@ public class DocumentService {
         return toResponse(docRepo.save(doc));
     }
 
+    @Transactional
     public void delete(Long userId, Long docId) {
         findOwned(userId, docId);
+        // 章节通过 document_id 外键引用本文档，须先清理其下冲突/补丁再删章节，否则 FK 冲突
+        chapterRepo.findByDocumentId(docId).forEach(ch -> {
+            conflictRepo.findByChapterId(ch.getId())
+                    .forEach(c -> patchRepo.deleteByConflictId(c.getId()));
+            conflictRepo.deleteByChapterId(ch.getId());
+        });
+        chapterRepo.deleteByDocumentId(docId);
         docRepo.deleteById(docId);
     }
 
@@ -55,6 +70,15 @@ public class DocumentService {
         if (!doc.getUser().getId().equals(userId))
             throw new ForbiddenException("无权操作此文档");
         return doc;
+    }
+
+    /** 校验项目存在且属于当前用户，防止越权往他人项目插入/读取章节。 */
+    private Project findOwnedProject(Long userId, Long projectId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("项目不存在"));
+        if (!project.getUser().getId().equals(userId))
+            throw new ForbiddenException("无权操作此项目");
+        return project;
     }
 
     private DocumentResponse toResponse(Document d) {

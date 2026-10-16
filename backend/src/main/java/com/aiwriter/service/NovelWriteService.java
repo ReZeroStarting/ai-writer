@@ -1,6 +1,8 @@
 package com.aiwriter.service;
 
 import com.aiwriter.ai.ClaudeService;
+import com.aiwriter.exception.ForbiddenException;
+import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -92,9 +94,14 @@ public class NovelWriteService {
         chapterRepo.save(ch);
     }
 
-    public void saveChapterContent(Long chapterId, String content) {
-        Chapter ch = chapterRepo.findById(chapterId).orElse(null);
-        if (ch == null) return;
+    public void saveChapterContent(Long userId, Long frameworkId, Long chapterId, String content) {
+        // 双重归属校验：框架归属 + 章节确实属于该框架，杜绝跨用户/跨框架越权写入
+        frameworkService.findOwned(userId, frameworkId);
+        Chapter ch = chapterRepo.findById(chapterId)
+                .orElseThrow(() -> new NotFoundException("章节不存在"));
+        if (ch.getFramework() == null || !frameworkId.equals(ch.getFramework().getId())) {
+            throw new ForbiddenException("该章节不属于指定框架");
+        }
         Document doc = ch.getDocument();
         if (doc != null) {
             doc.setContent(content);

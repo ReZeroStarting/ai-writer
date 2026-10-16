@@ -8,4 +8,7 @@ import java.util.Optional;
 public interface ChapterRepository extends JpaRepository<Chapter, Long> {
     List<Chapter> findByFrameworkIdOrderByChapterIndexAsc(Long frameworkId);
     Optional<Chapter> findTopByFrameworkIdOrderByChapterIndexDesc(Long frameworkId);
+    List<Chapter> findByDocumentId(Long documentId);
+    void deleteByFrameworkId(Long frameworkId);
+    void deleteByDocumentId(Long documentId);
 }

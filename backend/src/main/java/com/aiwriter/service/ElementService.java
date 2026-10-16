@@ -4,6 +4,7 @@ import com.aiwriter.ai.ClaudeService;
 import com.aiwriter.dto.request.AiGenerateElementsRequest;
 import com.aiwriter.dto.request.FrameworkElementRequest;
 import com.aiwriter.dto.response.ElementResponse;
+import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
@@ -39,8 +40,7 @@ public class ElementService {
 
     public ElementResponse update(Long userId, Long frameworkId, String elementId, FrameworkElementRequest req) {
         frameworkService.findOwned(userId, frameworkId);
-        FrameworkElement latest = elementRepo.findLatestByElementId(elementId)
-                .orElseThrow(() -> new NotFoundException("元素不存在"));
+        FrameworkElement latest = requireElementInFramework(frameworkId, elementId);
         int newVersion = latest.getVersion() + 1;
 
         FrameworkElement el = FrameworkElement.builder()
@@ -53,16 +53,30 @@ public class ElementService {
 
     public void delete(Long userId, Long frameworkId, String elementId) {
         frameworkService.findOwned(userId, frameworkId);
-        FrameworkElement latest = elementRepo.findLatestByElementId(elementId)
-                .orElseThrow(() -> new NotFoundException("元素不存在"));
+        FrameworkElement latest = requireElementInFramework(frameworkId, elementId);
         latest.setIsDeprecated(true);
         elementRepo.save(latest);
     }
 
     public List<ElementResponse> getVersions(Long userId, Long frameworkId, String elementId) {
         frameworkService.findOwned(userId, frameworkId);
+        // 先确认该元素确实属于这个（已校验归属的）框架，防止「我的框架 + 别人的元素 id」交叉越权
+        requireElementInFramework(frameworkId, elementId);
         return elementRepo.findVersionsByElementId(elementId).stream()
                 .map(this::toResponse).toList();
+    }
+
+    /**
+     * 取元素最新版本，并强制校验其所属框架 == 传入的 frameworkId。
+     * 用于堵住交叉越权：攻击者用「自己的 frameworkId」+「他人的 elementId」绕过框架归属校验。
+     */
+    private FrameworkElement requireElementInFramework(Long frameworkId, String elementId) {
+        FrameworkElement latest = elementRepo.findLatestByElementId(elementId)
+                .orElseThrow(() -> new NotFoundException("元素不存在"));
+        if (latest.getFramework() == null || !frameworkId.equals(latest.getFramework().getId())) {
+            throw new ForbiddenException("该元素不属于指定框架");
+        }
+        return latest;
     }
 
     public List<ElementResponse> aiGenerate(Long userId, Long frameworkId, AiGenerateElementsRequest req) {

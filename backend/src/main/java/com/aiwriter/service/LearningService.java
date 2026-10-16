@@ -25,6 +25,10 @@ public class LearningService {
     public JobResponse startLearning(Long userId, Long templateId, LearnRequest req) {
         StyleTemplate template = styleRepo.findById(templateId)
                 .orElseThrow(() -> new NotFoundException("风格模板不存在"));
+        // 归属校验：否则 B 可对 A 的模板发起学习，异步完成后会用 B 的分析结果
+        // 覆盖写入 A 的 systemPrompt（跨用户篡改，见 processJobAsync 第 53-55 行）。
+        if (!template.getUser().getId().equals(userId))
+            throw new ForbiddenException("无权操作此风格模板");
 
         SourceMaterial material = SourceMaterial.builder()
                 .user(User.builder().id(userId).build()).template(template)
