@@ -154,6 +154,7 @@ async function handleAiGen() {
     const { frameworkApi } = await import('@/api/framework')
     const res = await frameworkApi.aiGenerateElements(fwId, aiGenForm.value)
     fwStore.elements = [...res.data, ...fwStore.elements]
+    await fwStore.refreshSummary(fwId)
     ElMessage.success('AI 生成完成')
     showAiGen.value = false
   } catch (e: any) {

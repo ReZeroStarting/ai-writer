@@ -32,6 +32,7 @@ export const useFrameworkStore = defineStore('framework', () => {
   async function createElement(fwId: number, data: { type: string; name: string; content: string }) {
     const res = await frameworkApi.createElement(fwId, data)
     elements.value.unshift(res.data)
+    await refreshSummary(fwId)
     return res.data
   }
 
@@ -45,6 +46,15 @@ export const useFrameworkStore = defineStore('framework', () => {
   async function deleteElement(fwId: number, elementId: string) {
     await frameworkApi.deleteElement(fwId, elementId)
     elements.value = elements.value.filter(e => e.id !== elementId)
+    await refreshSummary(fwId)
+  }
+
+  /** 重新拉取框架汇总，使顶部统计卡片（元素数/章节数/冲突数）即时更新。 */
+  async function refreshSummary(fwId: number) {
+    try {
+      const res = await frameworkApi.get(fwId)
+      framework.value = res.data
+    } catch { /* 汇总刷新失败不影响主流程 */ }
   }
 
   async function fetchConflicts(fwId: number) {
@@ -72,7 +82,7 @@ export const useFrameworkStore = defineStore('framework', () => {
   return {
     framework, elements, chapters, conflicts, events, loading,
     openFramework, fetchFramework,
-    createElement, updateElement, deleteElement,
+    createElement, updateElement, deleteElement, refreshSummary,
     fetchConflicts, resolveConflict,
     fetchEvents, finishFramework,
   }

@@ -43,13 +43,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/projects'
 import { ElMessage } from 'element-plus'
 import { MoreFilled } from '@element-plus/icons-vue'
 import type { Project } from '@/types'
 
+const route = useRoute()
 const router = useRouter()
 const store = useProjectStore()
 const showCreate = ref(false); const newName = ref('')
@@ -63,6 +64,13 @@ const filteredProjects = computed(() => {
 })
 
 function selectProject(id: number) { store.setCurrent(id); router.push(`/project/${id}`) }
+
+// 刷新/直链进来时，从路由参数恢复当前项目，保证 .active 高亮正确
+watch(
+  () => route.params.id,
+  (id) => { if (id) store.setCurrent(Number(id)) },
+  { immediate: true },
+)
 
 async function handleCreate() {
   if (!newName.value.trim()) return

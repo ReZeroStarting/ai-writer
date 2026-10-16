@@ -17,10 +17,13 @@ import DocEditor from '@/components/editor/DocEditor.vue'
 
 const route = useRoute()
 const projects = useProjectStore()
-const projectId = computed(() => Number(route.params.projectId) || projects.currentId)
+// 路由参数名是 `id`（见 router: project/:id?）；刷新/直链时 route.params.id 是唯一真源，
+// 不能只靠 Pinia 内存态 projects.currentId，否则刷新后左侧章节列表会消失。
+const routeProjectId = computed(() => Number(route.params.id) || null)
+const projectId = computed(() => routeProjectId.value || projects.currentId)
 const currentId = computed(() => Number(route.params.docId) || null)
 
-watch(projectId, (id) => { if (id) projects.setCurrent(id) }, { immediate: true })
+watch(routeProjectId, (id) => { if (id) projects.setCurrent(id) }, { immediate: true })
 </script>
 
 <style scoped>
