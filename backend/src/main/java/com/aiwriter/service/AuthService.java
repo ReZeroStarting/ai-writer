@@ -46,14 +46,17 @@ public class AuthService {
         User user = userRepo.findByEmail(req.getAccount())
                 .or(() -> userRepo.findByUsername(req.getAccount()))
                 .or(() -> userRepo.findByPhone(req.getAccount()))
-                .orElseThrow(() -> {
-                    log.warn("登录失败: 账号不存在 account={}", req.getAccount());
-                    return new AuthException("账号不存在");
-                });
+                .orElse(null);
+
+        if (user == null) {
+            // 安全：账号不存在与密码错误返回同一提示，避免被用于枚举已注册账号
+            log.warn("登录失败: 账号不存在 account={}", req.getAccount());
+            throw new AuthException("账号或密码错误");
+        }
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
             log.warn("登录失败: 密码错误 userId={}, username={}", user.getId(), user.getUsername());
-            throw new AuthException("密码错误");
+            throw new AuthException("账号或密码错误");
         }
 
         log.info("用户登录: userId={}, username={}", user.getId(), user.getUsername());

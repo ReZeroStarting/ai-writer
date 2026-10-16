@@ -20,7 +20,7 @@
 
     <div v-if="streaming" class="dialog-output">
       <div class="output-header">AI 生成中...</div>
-      <div class="output-content" v-html="outputText"></div>
+      <div class="output-content" v-text="outputText"></div>
     </div>
 
     <template #footer>
@@ -113,8 +113,18 @@ async function handleGenerate() {
   streaming.value = false
 }
 
+/** 转义 HTML 特殊字符，防止 AI 输出里的标签被当作 HTML 执行/持久化。 */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 function handleInsert() {
-  emit('insert', outputText.value)
+  // AI 输出为纯文本：转义后再插入，换行转 <br> 保留排版
+  emit('insert', escapeHtml(outputText.value).replace(/\n/g, '<br>'))
   outputText.value = ''
   visible.value = false
 }
@@ -132,5 +142,6 @@ defineExpose({ open })
   min-height: 80px; max-height: 300px; overflow-y: auto;
   font-size: 14px; line-height: 1.7;
   color: var(--el-text-color-primary, #303133);
+  white-space: pre-wrap; word-break: break-word;
 }
 </style>

@@ -22,7 +22,7 @@
 
         <div v-if="streaming" class="ai-output">
           <div class="output-header">AI 生成中...</div>
-          <div class="output-content" v-html="outputText"></div>
+          <div class="output-content" v-text="outputText"></div>
           <el-button size="small" type="success" @click="insertText" style="margin-top:8px;">插入到文档</el-button>
         </div>
       </el-tab-pane>
@@ -170,7 +170,23 @@ async function callAi(endpoint: string) {
   streaming.value = false
 }
 
-function insertText() { emit('insert', outputText.value); outputText.value = '' }
+/**
+ * 把 AI 纯文本输出安全地转成可插入编辑器的 HTML 片段：
+ * 先转义 HTML 特殊字符（防止 <img onerror> 之类被当标签执行/持久化），
+ * 再把换行转成 <br> 以保留排版。
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+function toSafeHtml(text: string): string {
+  return escapeHtml(text).replace(/\n/g, '<br>')
+}
+function insertText() { emit('insert', toSafeHtml(outputText.value)); outputText.value = '' }
 function handleInsert(text: string) { emit('insert', text) }
 </script>
 
@@ -185,7 +201,7 @@ function handleInsert(text: string) { emit('insert', text) }
 .ai-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
 .ai-output { margin-top: 12px; }
 .output-header { font-size: 13px; color: var(--el-color-primary, #409eff); margin-bottom: 8px; }
-.output-content { background: var(--el-bg-color, #fff); border: 1px solid var(--el-border-color, #e4e7ed); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 300px; overflow-y: auto; font-size: 14px; line-height: 1.7; color: var(--el-text-color-primary, #303133); }
+.output-content { background: var(--el-bg-color, #fff); border: 1px solid var(--el-border-color, #e4e7ed); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 300px; overflow-y: auto; font-size: 14px; line-height: 1.7; color: var(--el-text-color-primary, #303133); white-space: pre-wrap; word-break: break-word; }
 
 /* Check tab */
 .check-panel { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }

@@ -121,6 +121,25 @@ class AuthServiceTest {
         assertThrows(AuthException.class, () -> authService.login(loginRequest));
     }
 
+    /** 防账号枚举：「账号不存在」与「密码错误」必须返回完全相同的提示。 */
+    @Test
+    void shouldReturnSameMessageForNonexistentAccountAndWrongPassword() {
+        // 账号不存在
+        when(userRepo.findByEmail("test@example.com")).thenReturn(Optional.empty());
+        when(userRepo.findByUsername("test@example.com")).thenReturn(Optional.empty());
+        when(userRepo.findByPhone("test@example.com")).thenReturn(Optional.empty());
+        String msgNonexistent = assertThrows(AuthException.class,
+                () -> authService.login(loginRequest)).getMessage();
+
+        // 密码错误（同一账号存在，仅密码不对）
+        when(userRepo.findByEmail("test@example.com")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("password123", "hashed-password")).thenReturn(false);
+        String msgWrongPwd = assertThrows(AuthException.class,
+                () -> authService.login(loginRequest)).getMessage();
+
+        assertEquals(msgNonexistent, msgWrongPwd, "两种失败必须返回同一提示，避免枚举账号");
+    }
+
     @Test
     void shouldLoginWithUsername() {
         loginRequest.setAccount("testuser");
