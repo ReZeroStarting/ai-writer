@@ -10,8 +10,6 @@ import com.aiwriter.repository.ConflictRepository;
 import com.aiwriter.repository.DocumentRepository;
 import com.aiwriter.repository.PatchRepository;
 import com.aiwriter.repository.ProjectRepository;
-import com.aiwriter.exception.ForbiddenException;
-import com.aiwriter.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,20 +63,16 @@ public class DocumentService {
     }
 
     private Document findOwned(Long userId, Long docId) {
-        Document doc = docRepo.findById(docId)
-                .orElseThrow(() -> new NotFoundException("文档不存在"));
-        if (!doc.getUser().getId().equals(userId))
-            throw new ForbiddenException("无权操作此文档");
-        return doc;
+        return OwnershipGuard.requireOwned(
+                docRepo.findById(docId), userId,
+                d -> d.getUser().getId(), "文档", "文档");
     }
 
     /** 校验项目存在且属于当前用户，防止越权往他人项目插入/读取章节。 */
     private Project findOwnedProject(Long userId, Long projectId) {
-        Project project = projectRepo.findById(projectId)
-                .orElseThrow(() -> new NotFoundException("项目不存在"));
-        if (!project.getUser().getId().equals(userId))
-            throw new ForbiddenException("无权操作此项目");
-        return project;
+        return OwnershipGuard.requireOwned(
+                projectRepo.findById(projectId), userId,
+                p -> p.getUser().getId(), "项目", "项目");
     }
 
     private DocumentResponse toResponse(Document d) {

@@ -18,10 +18,9 @@ public class FrameworkService {
     private final ConflictRepository conflictRepo;
 
     public FrameworkResponse openFramework(Long userId, Long projectId) {
-        Project project = projectRepo.findById(projectId)
-                .orElseThrow(() -> new NotFoundException("项目不存在"));
-        if (!project.getUser().getId().equals(userId))
-            throw new ForbiddenException("无权操作此项目");
+        Project project = OwnershipGuard.requireOwned(
+                projectRepo.findById(projectId), userId,
+                p -> p.getUser().getId(), "项目", "项目");
         if ("framework".equals(project.getMode()))
             throw new IllegalArgumentException("该项目已是框架模式");
         if (frameworkRepo.findByProjectId(projectId).isPresent())
@@ -59,11 +58,9 @@ public class FrameworkService {
     }
 
     public Framework findOwned(Long userId, Long frameworkId) {
-        Framework fw = frameworkRepo.findById(frameworkId)
-                .orElseThrow(() -> new NotFoundException("框架不存在"));
-        if (!fw.getUser().getId().equals(userId))
-            throw new ForbiddenException("无权操作此框架");
-        return fw;
+        return OwnershipGuard.requireOwned(
+                frameworkRepo.findById(frameworkId), userId,
+                fw -> fw.getUser().getId(), "框架", "框架");
     }
 
     private FrameworkResponse toResponse(Framework fw) {
