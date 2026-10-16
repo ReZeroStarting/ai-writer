@@ -125,6 +125,15 @@ npm run dev
 
 打开 `http://localhost:3000`。开发服务器已把 `/api` 代理到 `localhost:8080`，前端无需额外配置跨域。
 
+如果后端跑在别的端口（例如为了验证临时起在 8093），无需另建配置文件，用环境变量覆盖代理目标即可：
+
+```bash
+# Linux / macOS
+VITE_API_TARGET=http://127.0.0.1:8093 npm run dev
+# Windows PowerShell
+$env:VITE_API_TARGET="http://127.0.0.1:8093"; npm run dev
+```
+
 ### 常用命令
 
 | 位置 | 命令 | 作用 |
