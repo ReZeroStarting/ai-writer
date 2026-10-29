@@ -50,6 +50,16 @@ watch(() => props.docId, async (id) => {
   if (store.currentDoc) {
     // 老数据 / 框架生成的章节可能是纯文本：转成段落再交给编辑器，否则换行被折叠
     content.value = ensureHtml(store.currentDoc.content || store.currentDoc.title || '')
+
+    // 历史数据的标题是「第一章正文正文正文…」这种糊（当年用 textContent 取文本，
+    // 段落之间没换行）。只在标题明显过长、且确实来自正文开头时才纠正，
+    // 避免覆盖用户自己改过的标题。
+    const stored = store.currentDoc.title || ''
+    const squash = (s: string) => s.replace(/\s+/g, '')
+    const looksDerived = stored.length >= 55 && squash(plainText.value).startsWith(squash(stored).slice(0, 20))
+    if (looksDerived && stored !== title.value) {
+      await store.save(id, title.value, content.value)
+    }
   }
   previousId = id
 }, { immediate: true })
