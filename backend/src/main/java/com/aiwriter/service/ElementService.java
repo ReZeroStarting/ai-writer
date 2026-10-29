@@ -103,9 +103,22 @@ public class ElementService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 模型经常把 JSON 包在 ```json 代码块里，或前后加一句解释。
+     * 直接 readValue 会失败，然后整段原文被当成一个元素的 content 存下来——
+     * 界面上就会出现一条名字叫「AI 生成」、内容是一坨 JSON 的脏数据。
+     */
+    private String extractJsonArray(String raw) {
+        if (raw == null) return "[]";
+        int start = raw.indexOf('[');
+        int end = raw.lastIndexOf(']');
+        if (start < 0 || end <= start) return raw;
+        return raw.substring(start, end + 1);
+    }
+
     private List<ElementResponse> parseGeneratedElements(Framework fw, Long userId, String type, String response) {
         try {
-            var list = objectMapper.readValue(response, List.class);
+            var list = objectMapper.readValue(extractJsonArray(response), List.class);
             List<ElementResponse> results = new ArrayList<>();
             for (var item : list) {
                 @SuppressWarnings("unchecked")

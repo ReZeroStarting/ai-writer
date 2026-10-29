@@ -218,6 +218,29 @@ class ElementServiceTest {
         verify(claudeService).complete(anyString(), anyString());
     }
 
+    /** 模型把 JSON 包在 ```json 代码块里也能解析——否则整段原文会变成一条脏数据。 */
+    @Test
+    void shouldParseJsonWrappedInCodeFence() {
+        when(frameworkService.findOwned(1L, 100L)).thenReturn(framework);
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of());
+        when(elementRepo.save(any(FrameworkElement.class))).thenAnswer(inv -> {
+            FrameworkElement e = inv.getArgument(0);
+            e.setCreatedAt(LocalDateTime.now());
+            return e;
+        });
+        when(claudeService.complete(anyString(), anyString())).thenReturn(
+                "好的，这是生成结果：\n```json\n[{\"name\":\"雾引\",\"content\":\"控制渡口的秘密组织\"}]\n```\n希望有用。");
+
+        AiGenerateElementsRequest req = new AiGenerateElementsRequest();
+        req.setType("organization");
+
+        List<ElementResponse> results = elementService.aiGenerate(1L, 100L, req);
+
+        assertEquals(1, results.size());
+        assertEquals("雾引", results.get(0).getName());
+        assertEquals("控制渡口的秘密组织", results.get(0).getContent());
+    }
+
     @Test
     void shouldAiGenerateFallbackOnInvalidJson() {
         when(frameworkService.findOwned(1L, 100L)).thenReturn(framework);
