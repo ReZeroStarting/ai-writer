@@ -10,6 +10,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useDocStore } from '@/stores/documents'
+import { ensureHtml, htmlToPlain } from '@/utils/richText'
 import TiptapEditor from './TiptapEditor.vue'
 import AIPanel from './AIPanel.vue'
 
@@ -20,24 +21,15 @@ const content = ref('')
 
 const doc = computed(() => store.currentDoc)
 
-let htmlToText: (html: string) => string
-function getHtmlToText() {
-  if (!htmlToText) {
-    const el = document.createElement('div')
-    htmlToText = (html: string) => {
-      el.innerHTML = html
-      return el.textContent || ''
-    }
-  }
-  return htmlToText
-}
-
-const plainText = computed(() => getHtmlToText()(content.value))
+// 用统一的行内转换：<p> 之间要变成换行，否则 textContent 会把整篇挤成一整行，
+// 标题也会变成「第一章正文正文正文…」这种 60 字的糊
+const plainText = computed(() => htmlToPlain(content.value))
 
 const title = computed(() => {
   const text = plainText.value.trim()
   if (!text) return '未命名章节'
-  return text.split('\n')[0].slice(0, 60)
+  // 模型爱在开头写 "## 第一章 xxx"，标题里就别带井号了
+  return text.split('\n')[0].replace(/^#{1,6}\s+/, '').slice(0, 60)
 })
 
 // Optimistically update sidebar title as user types
@@ -56,7 +48,8 @@ watch(() => props.docId, async (id) => {
   }
   await store.fetchOne(id)
   if (store.currentDoc) {
-    content.value = store.currentDoc.content || store.currentDoc.title || ''
+    // 老数据 / 框架生成的章节可能是纯文本：转成段落再交给编辑器，否则换行被折叠
+    content.value = ensureHtml(store.currentDoc.content || store.currentDoc.title || '')
   }
   previousId = id
 }, { immediate: true })

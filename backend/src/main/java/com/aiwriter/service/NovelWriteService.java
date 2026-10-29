@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.aiwriter.ai.HtmlText;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
@@ -41,8 +42,8 @@ public class NovelWriteService {
         }
         latest = chapterService.markGenerating(latest.getId());
 
-        String currentContent = latest.getDocument() != null && latest.getDocument().getContent() != null
-                ? latest.getDocument().getContent() : "";
+        String currentContent = latest.getDocument() != null
+                ? HtmlText.htmlToPlain(latest.getDocument().getContent()) : "";
         ContextBuilder.ContextPackage ctx = contextBuilder.buildContext(frameworkId, currentContent);
 
         String systemPrompt = buildNovelSystemPrompt(ctx);
@@ -69,8 +70,8 @@ public class NovelWriteService {
         }
         latest = chapterService.markGenerating(latest.getId());
 
-        String existing = latest.getDocument() != null && latest.getDocument().getContent() != null
-                ? latest.getDocument().getContent() : "";
+        String existing = latest.getDocument() != null
+                ? HtmlText.htmlToPlain(latest.getDocument().getContent()) : "";
         ContextBuilder.ContextPackage ctx = contextBuilder.buildContext(frameworkId, existing);
 
         String systemPrompt = buildNovelSystemPrompt(ctx);
@@ -157,8 +158,9 @@ public class NovelWriteService {
         Chapter ch = chapterRepo.findById(chapterId).orElseThrow();
         Document doc = ch.getDocument();
         if (doc != null) {
-            String current = doc.getContent() != null ? doc.getContent() : "";
-            doc.setContent(current + "\n\n【用户插入】\n" + userContent + "\n");
+            // 文档存的是 HTML；拼接要在纯文本层面做，拼完再转回 HTML
+            String current = HtmlText.htmlToPlain(doc.getContent());
+            doc.setContent(HtmlText.plainToHtml(current + "\n\n【用户插入】\n" + userContent + "\n"));
             documentRepo.save(doc);
         }
         ch.setStatus(Chapter.ChapterStatus.USER_EDITING);
@@ -175,7 +177,7 @@ public class NovelWriteService {
         }
         Document doc = ch.getDocument();
         if (doc != null) {
-            doc.setContent(content);
+            doc.setContent(HtmlText.ensureHtml(content));
             documentRepo.save(doc);
         }
     }

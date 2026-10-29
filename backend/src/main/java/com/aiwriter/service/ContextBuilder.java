@@ -1,5 +1,6 @@
 package com.aiwriter.service;
 
+import com.aiwriter.ai.HtmlText;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,8 @@ public class ContextBuilder {
         if (!chapters.isEmpty()) {
             Chapter prev = chapters.get(chapters.size() - 1);
             if (prev.getDocument() != null && prev.getDocument().getContent() != null) {
-                recent.append(prev.getDocument().getContent());
+                // 文档里存的是 HTML，喂给模型前要转回纯文本
+                recent.append(HtmlText.htmlToPlain(prev.getDocument().getContent()));
                 if (recent.length() > MAX_RECENT_CONTENT_CHARS) {
                     recent.setLength(MAX_RECENT_CONTENT_CHARS);
                 }

@@ -1,5 +1,6 @@
 package com.aiwriter.service;
 
+import com.aiwriter.ai.HtmlText;
 import com.aiwriter.dto.response.ChapterResponse;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
@@ -62,7 +63,8 @@ public class ChapterService {
         if (content != null && !content.isEmpty()) {
             Document doc = ch.getDocument();
             if (doc != null) {
-                doc.setContent(content);
+                // 模型给的是纯文本，入库统一存 HTML，编辑器才能渲染出段落
+                doc.setContent(HtmlText.plainToHtml(content));
                 documentRepo.save(doc);
             }
         }

@@ -78,6 +78,7 @@ import { Loading, WarningFilled } from '@element-plus/icons-vue'
 import { streamSseText, isUpstreamErrorNotice } from '@/utils/sse'
 import { elementTypeLabel } from '@/types'
 import { docsApi } from '@/api/documents'
+import { htmlToPlain } from '@/utils/richText'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,7 +127,8 @@ async function loadLatestContent() {
     currentChapterId.value = chapter.id
     if (chapter.documentId && !currentContent.value) {
       const doc = await docsApi.get(chapter.documentId)
-      currentContent.value = doc.data?.content || ''
+      // 文档里存的是 HTML，画布按纯文本显示（保留分段）
+      currentContent.value = htmlToPlain(doc.data?.content)
     }
   } catch { /* 还没有章节 */ }
 }
