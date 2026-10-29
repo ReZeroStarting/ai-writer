@@ -6,12 +6,18 @@ import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 @RequiredArgsConstructor
 public class NovelWriteService {
+
+    private static final Logger log = LoggerFactory.getLogger(NovelWriteService.class);
+
     private final AiProvider claudeService;
     private final ContextBuilder contextBuilder;
     private final ChapterService chapterService;
@@ -42,15 +48,7 @@ public class NovelWriteService {
         String systemPrompt = buildNovelSystemPrompt(ctx);
         String userPrompt = buildContinueUserPrompt(ctx, currentContent);
 
-        final Chapter chapterRef = latest;
-        return claudeService.stream(systemPrompt, userPrompt)
-                .doOnComplete(() -> {
-                    chapterService.markGenerated(chapterRef.getId(), null);
-                    Document doc = chapterRef.getDocument();
-                    if (doc != null) {
-                        conflictService.checkChapterConsistency(fw, chapterRef, doc.getContent());
-                    }
-                });
+        return persistWhenDone(claudeService.stream(systemPrompt, userPrompt), fw, latest);
     }
 
     public Flux<String> continueWriting(Long userId, Long frameworkId) {
@@ -70,19 +68,52 @@ public class NovelWriteService {
         String systemPrompt = buildNovelSystemPrompt(ctx);
         String userPrompt = buildContinueUserPrompt(ctx, "");
 
-        final Chapter chapterRef = nextChapter;
-        return claudeService.stream(systemPrompt, userPrompt)
+        return persistWhenDone(claudeService.stream(systemPrompt, userPrompt), fw, nextChapter);
+    }
+
+    /**
+     * 把流式生成的正文落库。
+     *
+     * <p>之前这里只改了章节状态、并把**空的** document 内容交给冲突检测，于是：
+     * 生成的内容只存在于浏览器内存里，一旦刷新就没了；冲突检测永远看不到正文。
+     * 现在边写边攒，流结束时统一写入 document，再做冲突检测。
+     *
+     * <p>落库交给 {@link ChapterService#completeGeneration}（@Transactional）：
+     * Document 是延迟加载代理，在没有 session 的 Reactor 回调里直接访问会
+     * LazyInitializationException。
+     */
+    private Flux<String> persistWhenDone(Flux<String> source, Framework fw, Chapter chapter) {
+        StringBuilder buffer = new StringBuilder();
+        return source
+                .doOnNext(buffer::append)
                 .doOnComplete(() -> {
-                    chapterService.markGenerated(chapterRef.getId(), null);
-                    Document doc2 = chapterRef.getDocument();
-                    if (doc2 != null) {
-                        conflictService.checkChapterConsistency(fw, chapterRef, doc2.getContent());
+                    String text = buffer.toString();
+                    try {
+                        chapterService.completeGeneration(chapter.getId(), text);
+                        if (!text.isEmpty()) {
+                            conflictService.checkChapterConsistency(fw, chapter, text);
+                            // 语义审校要调一次模型（阻塞），放到弹性线程池里跑，
+                            // 不能在 reactor-http-nio 线程上 block()，也不能拖慢响应收尾
+                            Schedulers.boundedElastic().schedule(() -> {
+                                try {
+                                    int found = conflictService.aiCheckAgainstElements(fw, chapter, text);
+                                    if (found > 0) {
+                                        log.info("AI 冲突检测: 章节 {} 发现 {} 条语义冲突", chapter.getId(), found);
+                                    }
+                                } catch (Exception e) {
+                                    log.warn("AI 冲突检测异常 chapterId={}: {}", chapter.getId(), e.getMessage());
+                                }
+                            });
+                        }
+                    } catch (Exception e) {
+                        log.warn("章节落库失败 chapterId={}: {}", chapter.getId(), e.getMessage(), e);
                     }
                 });
     }
 
     public void intervene(Long userId, Long frameworkId, Long chapterId, String userContent) {
-        Framework fw = frameworkService.findOwned(userId, frameworkId);
+        // 归属校验：框架必须属于当前用户，避免用他人 chapterId 写入内容
+        frameworkService.findOwned(userId, frameworkId);
         Chapter ch = chapterRepo.findById(chapterId).orElseThrow();
         Document doc = ch.getDocument();
         if (doc != null) {

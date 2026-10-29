@@ -1,5 +1,6 @@
 package com.aiwriter.controller;
 
+import com.aiwriter.ai.SseText;
 import com.aiwriter.dto.request.InterveneRequest;
 import com.aiwriter.dto.response.ChapterResponse;
 import com.aiwriter.model.Chapter;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,14 +26,14 @@ public class WriteController {
 
     @PostMapping(value = "/frameworks/{frameworkId}/write/start", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> start(@PathVariable Long frameworkId, Authentication auth) {
-        return novelWriteService.startWriting(getUserId(auth), frameworkId)
-                .map(chunk -> "data: " + chunk + "\n\n");
+        // 不要自己拼 "data: ...\n\n"：Spring MVC 已按 SSE 协议加前缀、按行拆分并补空行，
+        // 手拼会得到 "data:data: ..." 的双前缀（真实踩过的坑）。
+        return SseText.escapeAll(novelWriteService.startWriting(getUserId(auth), frameworkId));
     }
 
     @PostMapping(value = "/frameworks/{frameworkId}/write/continue", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> continueWrite(@PathVariable Long frameworkId, Authentication auth) {
-        return novelWriteService.continueWriting(getUserId(auth), frameworkId)
-                .map(chunk -> "data: " + chunk + "\n\n");
+        return SseText.escapeAll(novelWriteService.continueWriting(getUserId(auth), frameworkId));
     }
 
     @PostMapping("/frameworks/{frameworkId}/write/interrupt")
@@ -76,6 +78,21 @@ public class WriteController {
         frameworkService.findOwned(userId, frameworkId);
         Chapter ch = chapterService.getLatestChapter(frameworkId);
         return ch != null ? ResponseEntity.ok(chapterService.toResponse(ch)) : ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 章节列表。
+     *
+     * <p>写作台的「章节列表」面板此前没有任何数据来源（前端从未拉取），所以永远显示「暂无章节」。
+     */
+    @GetMapping("/frameworks/{frameworkId}/chapters")
+    public ResponseEntity<List<ChapterResponse>> chapters(
+            @PathVariable Long frameworkId, Authentication auth) {
+        frameworkService.findOwned(getUserId(auth), frameworkId);
+        List<ChapterResponse> list = chapterService.list(frameworkId).stream()
+                .map(chapterService::toResponse)
+                .toList();
+        return ResponseEntity.ok(list);
     }
 
     private Long getUserId(Authentication auth) { return (Long) auth.getPrincipal(); }

@@ -7,12 +7,14 @@ import com.aiwriter.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class ChapterService {
     private final ChapterRepository chapterRepo;
+    private final DocumentRepository documentRepo;
     private final FrameworkElementRepository elementRepo;
     private final EventService eventService;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -43,6 +45,32 @@ public class ChapterService {
                 .orElseThrow(() -> new NotFoundException("章节不存在"));
         ch.setStatus(Chapter.ChapterStatus.AI_GENERATING);
         return chapterRepo.save(ch);
+    }
+
+    /**
+     * 生成结束：把 AI 写出的正文写进章节文档，并把状态推进到 AI_GENERATED。
+     *
+     * <p>必须是独立的事务方法（由 NovelWriteService 跨 bean 调用才会走代理）：
+     * 之前直接在 Reactor 的 doOnComplete 里访问 chapter.getDocument()，Document 是
+     * 延迟加载代理且当时没有 session，直接抛 LazyInitializationException，
+     * 表现是「正文只在浏览器里，刷新就没了、章节一直显示生成中」。
+     */
+    @Transactional
+    public Chapter completeGeneration(Long chapterId, String content) {
+        Chapter ch = chapterRepo.findById(chapterId)
+                .orElseThrow(() -> new NotFoundException("章节不存在"));
+        if (content != null && !content.isEmpty()) {
+            Document doc = ch.getDocument();
+            if (doc != null) {
+                doc.setContent(content);
+                documentRepo.save(doc);
+            }
+        }
+        ch.setStatus(Chapter.ChapterStatus.AI_GENERATED);
+        chapterRepo.save(ch);
+        eventService.appendEventInternal(ch.getFramework(), WritingEvent.EventType.CHAPTER_AI_GENERATED,
+                Map.of("chapterId", ch.getId()));
+        return ch;
     }
 
     public Chapter markGenerated(Long chapterId, String summary) {

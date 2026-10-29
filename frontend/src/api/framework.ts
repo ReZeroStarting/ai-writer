@@ -21,17 +21,20 @@ export const frameworkApi = {
   aiGenerateElements: (fwId: number, data: { type: string; hint?: string }) =>
     client.post<FrameworkElement[]>(`/v1/frameworks/${fwId}/elements/ai-generate`, data),
 
-  // Writing
+  // Writing（SSE 流式：responseType/stream + fetch 适配器；timeout:0 关掉 30s 默认超时，
+  // 否则长章节生成会在中途被掐断）
   startWriting: (fwId: number) =>
-    client.post(`/v1/frameworks/${fwId}/write/start`, null, { responseType: 'stream', adapter: 'fetch' }),
+    client.post(`/v1/frameworks/${fwId}/write/start`, null, { responseType: 'stream', adapter: 'fetch', timeout: 0 }),
   continueWriting: (fwId: number) =>
-    client.post(`/v1/frameworks/${fwId}/write/continue`, null, { responseType: 'stream', adapter: 'fetch' }),
+    client.post(`/v1/frameworks/${fwId}/write/continue`, null, { responseType: 'stream', adapter: 'fetch', timeout: 0 }),
   intervene: (fwId: number, data: { content: string; position?: string }) =>
     client.post<Chapter>(`/v1/frameworks/${fwId}/write/interrupt`, data),
   saveChapter: (fwId: number, chapterId: number, content: string) =>
     client.post(`/v1/frameworks/${fwId}/write/save`, { chapterId, content }),
   getLatestChapter: (fwId: number) =>
     client.get<Chapter>(`/v1/frameworks/${fwId}/write/latest-chapter`),
+  listChapters: (fwId: number) =>
+    client.get<Chapter[]>(`/v1/frameworks/${fwId}/chapters`),
 
   // Conflicts
   listConflicts: (fwId: number) => client.get<Conflict[]>(`/v1/frameworks/${fwId}/conflicts`),

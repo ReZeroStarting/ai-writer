@@ -19,7 +19,9 @@ const route = useRoute()
 const projects = useProjectStore()
 // 路由参数名是 `id`（见 router: project/:id?）；刷新/直链时 route.params.id 是唯一真源，
 // 不能只靠 Pinia 内存态 projects.currentId，否则刷新后左侧章节列表会消失。
-const routeProjectId = computed(() => Number(route.params.id) || null)
+// 注意：编辑页走的是另一条路由 project/:projectId/doc/:docId，参数名是 **projectId**，
+// 两条路由都要认，否则在编辑页刷新仍会丢章节列表。
+const routeProjectId = computed(() => Number(route.params.id ?? route.params.projectId) || null)
 const projectId = computed(() => routeProjectId.value || projects.currentId)
 const currentId = computed(() => Number(route.params.docId) || null)
 

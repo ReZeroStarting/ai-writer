@@ -68,12 +68,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFrameworkStore } from '@/stores/framework'
 import { frameworkApi } from '@/api/framework'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading, WarningFilled } from '@element-plus/icons-vue'
+import { streamSseText, isUpstreamErrorNotice } from '@/utils/sse'
+import { docsApi } from '@/api/documents'
 
 const route = useRoute()
 const router = useRouter()
@@ -98,6 +100,41 @@ const contextStats = computed(() => {
   return Object.entries(grouped).map(([label, count]) => ({ label, count }))
 })
 
+/** 章节列表：此前面板没有任何数据源，永远显示「暂无章节」 */
+async function loadChapters() {
+  const fwId = fwStore.framework?.id
+  if (!fwId) return
+  try {
+    chapters.value = (await frameworkApi.listChapters(fwId)).data
+  } catch { /* 非致命：面板留空 */ }
+}
+
+/**
+ * 打开页面/写完一章后，把最新章节的正文拉回画布。
+ * ChapterResponse 只有 documentId，正文要按文档接口取。
+ */
+async function loadLatestContent() {
+  const fwId = fwStore.framework?.id
+  if (!fwId) return
+  try {
+    const ch = await frameworkApi.getLatestChapter(fwId)
+    const chapter = ch.data
+    if (!chapter) return
+    currentChapterId.value = chapter.id
+    if (chapter.documentId && !currentContent.value) {
+      const doc = await docsApi.get(chapter.documentId)
+      currentContent.value = doc.data?.content || ''
+    }
+  } catch { /* 还没有章节 */ }
+}
+
+// 父组件（FrameworkView）异步加载框架，id 到位后再拉章节
+watch(() => fwStore.framework?.id, (id) => {
+  if (!id) return
+  loadChapters()
+  loadLatestContent()
+}, { immediate: true })
+
 function statusTag(s: string) {
   const map: Record<string, string> = { DRAFT: 'info', AI_GENERATING: 'warning', AI_GENERATED: 'success', USER_EDITING: '', COMPLETED: 'primary' }
   return map[s] ?? 'info'
@@ -120,19 +157,31 @@ async function startWriting() {
     } catch { currentChapterId.value = null }
 
     const response = await frameworkApi.startWriting(fwId)
-    const reader = response.data.getReader()
-    const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      currentContent.value += decoder.decode(value, { stream: true })
+    // 后端按 SSE 帧返回，必须解析后再拼接，否则正文里会混进 "data:" 协议头
+    await streamSseText(response.data, (text) => { currentContent.value += text })
+    // 上游失败时后端把原因当文本帧推下来：提示用户，且绝不能存成章节正文
+    if (isUpstreamErrorNotice(currentContent.value)) {
+      const notice = currentContent.value.trim()
+      currentContent.value = ''
+      throw new Error(notice)
     }
-    // Save content after stream completes
+    // 首次写作时，章节是后端在 /write/start 里新建的，开写前前端还拿不到 id，
+    // 所以流结束后补取一次，否则「保存兜底」永远会被跳过
+    if (!currentChapterId.value) {
+      try {
+        const ch = await frameworkApi.getLatestChapter(fwId)
+        currentChapterId.value = ch.data?.id ?? null
+      } catch { /* 可能确实还没有章节 */ }
+    }
+    // 后端在流结束时已把正文落库（NovelWriteService#persistWhenDone），
+    // 这里只补一次保存兜底，并刷新章节列表 / 框架统计
     if (currentChapterId.value) {
       try {
         await frameworkApi.saveChapter(fwId, currentChapterId.value, currentContent.value)
       } catch { /* save failure is non-fatal */ }
     }
+    await loadChapters()
+    if (fwStore.framework) await fwStore.fetchFramework(fwStore.framework.id)
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || 'AI 写作失败')
   }
