@@ -42,6 +42,11 @@ const router = createRouter({
       component: () => import('@/views/StyleManageView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/settings/ai', name: 'ai-settings',
+      component: () => import('@/views/AiSettingsView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

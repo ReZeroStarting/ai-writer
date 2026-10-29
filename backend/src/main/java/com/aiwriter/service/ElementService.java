@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.dto.request.AiGenerateElementsRequest;
 import com.aiwriter.dto.request.FrameworkElementRequest;
 import com.aiwriter.dto.response.ElementResponse;
@@ -18,7 +18,7 @@ import java.util.*;
 public class ElementService {
     private final FrameworkElementRepository elementRepo;
     private final FrameworkService frameworkService;
-    private final AiProvider claudeService;
+    private final AiProviderResolver aiProvider;
 
     public List<ElementResponse> list(Long userId, Long frameworkId, String type) {
         frameworkService.findOwned(userId, frameworkId);
@@ -97,7 +97,7 @@ public class ElementService {
         }
         userPrompt += "。仅返回 JSON 数组，不要其他文字。";
 
-        String response = claudeService.complete(systemPrompt, userPrompt);
+        String response = aiProvider.forUser(userId).complete(systemPrompt, userPrompt);
         return parseGeneratedElements(fw, userId, req.getType(), response);
     }
 

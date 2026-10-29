@@ -33,6 +33,7 @@ class ConflictServiceTest {
     @Mock private FrameworkService frameworkService;
     @Mock private EventService eventService;
     @Mock private com.aiwriter.ai.AiProvider aiProvider;
+    @Mock private com.aiwriter.ai.AiProviderResolver aiProviderResolver;
     @InjectMocks private ConflictService conflictService;
 
     private Framework framework;
@@ -41,6 +42,7 @@ class ConflictServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(aiProviderResolver.forUser(any())).thenReturn(aiProvider);
         User user = User.builder().id(1L).build();
         framework = Framework.builder().id(100L).user(user)
                 .status(Framework.FrameworkStatus.ACTIVE)
@@ -210,7 +212,7 @@ class ConflictServiceTest {
         });
         when(eventService.appendEventInternal(any(), any(), any())).thenReturn(null);
 
-        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+        int created = conflictService.aiCheckAgainstElements(1L, framework, chapter, LONG_TEXT);
 
         assertEquals(1, created);
         verify(conflictRepo).save(any(Conflict.class));
@@ -223,7 +225,7 @@ class ConflictServiceTest {
         when(aiProvider.complete(any(), any())).thenReturn(
                 "[{\"elementId\":\"not-a-real-element\",\"severity\":\"MAJOR\",\"description\":\"胡说\"}]");
 
-        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+        int created = conflictService.aiCheckAgainstElements(1L, framework, chapter, LONG_TEXT);
 
         assertEquals(0, created);
         verify(conflictRepo, never()).save(any(Conflict.class));
@@ -234,7 +236,7 @@ class ConflictServiceTest {
         when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
         when(aiProvider.complete(any(), any())).thenReturn("我觉得这一章写得不错，没有矛盾。");
 
-        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+        int created = conflictService.aiCheckAgainstElements(1L, framework, chapter, LONG_TEXT);
 
         assertEquals(0, created);
         verify(conflictRepo, never()).save(any(Conflict.class));
@@ -242,11 +244,11 @@ class ConflictServiceTest {
 
     @Test
     void aiCheckShouldSkipShortChaptersAndEmptyFrameworks() {
-        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, "太短了"));
+        assertEquals(0, conflictService.aiCheckAgainstElements(1L, framework, chapter, "太短了"));
         verify(aiProvider, never()).complete(any(), any());
 
         when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of());
-        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT));
+        assertEquals(0, conflictService.aiCheckAgainstElements(1L, framework, chapter, LONG_TEXT));
         verify(aiProvider, never()).complete(any(), any());
     }
 
@@ -255,7 +257,7 @@ class ConflictServiceTest {
         when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
         when(aiProvider.complete(any(), any())).thenThrow(new IllegalStateException("502 上游错误"));
 
-        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT));
+        assertEquals(0, conflictService.aiCheckAgainstElements(1L, framework, chapter, LONG_TEXT));
         verify(conflictRepo, never()).save(any(Conflict.class));
     }
 }

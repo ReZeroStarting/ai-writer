@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.dto.request.ResolveConflictRequest;
 import com.aiwriter.dto.response.ConflictResponse;
 import com.aiwriter.exception.ForbiddenException;
@@ -47,7 +47,7 @@ public class ConflictService {
     private final FrameworkElementRepository elementRepo;
     private final FrameworkService frameworkService;
     private final EventService eventService;
-    private final AiProvider aiProvider;
+    private final AiProviderResolver aiProvider;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public List<ConflictResponse> listByFramework(Long userId, Long frameworkId) {
@@ -152,7 +152,7 @@ public class ConflictService {
      *
      * @return 新建的冲突条数
      */
-    public int aiCheckAgainstElements(Framework fw, Chapter chapter, String content) {
+    public int aiCheckAgainstElements(Long userId, Framework fw, Chapter chapter, String content) {
         if (content == null || content.length() < 200) return 0;
         var elements = elementRepo.findLatestByFrameworkId(fw.getId());
         if (elements.isEmpty()) return 0;
@@ -170,7 +170,7 @@ public class ConflictService {
         String excerpt = content.length() > 6000 ? content.substring(0, 6000) : content;
         String raw;
         try {
-            raw = aiProvider.complete(CONFLICT_SYSTEM_PROMPT,
+            raw = aiProvider.forUser(userId).complete(CONFLICT_SYSTEM_PROMPT,
                     "【设定】\n" + spec + "\n【本章正文】\n" + excerpt);
         } catch (Exception e) {
             log.warn("AI 冲突检测调用失败，跳过本章: {}", e.getMessage());

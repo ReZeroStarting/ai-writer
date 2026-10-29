@@ -1,7 +1,7 @@
 package com.aiwriter.service;
 
 
-import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.ai.PromptBuilder;
 import com.aiwriter.dto.request.AiRequest;
 import com.aiwriter.exception.ForbiddenException;
@@ -18,13 +18,13 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class AiService {
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
-    private final AiProvider claude;
+    private final AiProviderResolver aiProvider;
     private final PromptBuilder prompts;
     private final StyleTemplateRepository styleRepo;
 
     public Flux<String> generateOutline(AiRequest req, Long userId) {
         log.info("AI生成大纲: topic={}", req.getContent().substring(0, Math.min(100, req.getContent().length())));
-        return claude.stream(prompts.buildOutlineSystem(), "主题：" + req.getContent());
+        return aiProvider.forUser(userId).stream(prompts.buildOutlineSystem(), "主题：" + req.getContent());
     }
 
     public Flux<String> continueWrite(AiRequest req, Long userId) {
@@ -32,7 +32,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "请续写：\n\n" + req.getContent();
         if (req.getInstruction() != null) msg = req.getInstruction() + "\n\n" + msg;
-        return claude.stream(prompts.buildContinueSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildContinueSystem(style), msg);
     }
 
     public Flux<String> polish(AiRequest req, Long userId) {
@@ -40,7 +40,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "请润色：\n\n" + req.getContent();
         if (req.getInstruction() != null) msg = req.getInstruction() + "\n\n" + msg;
-        return claude.stream(prompts.buildPolishSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildPolishSystem(style), msg);
     }
 
     public Flux<String> expand(AiRequest req, Long userId) {
@@ -48,7 +48,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "请扩展：\n\n" + req.getContent();
         if (req.getInstruction() != null) msg = req.getInstruction() + "\n\n" + msg;
-        return claude.stream(prompts.buildExpandSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildExpandSystem(style), msg);
     }
 
     public Flux<String> shorten(AiRequest req, Long userId) {
@@ -56,7 +56,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "请精简：\n\n" + req.getContent();
         if (req.getInstruction() != null) msg = req.getInstruction() + "\n\n" + msg;
-        return claude.stream(prompts.buildShortenSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildShortenSystem(style), msg);
     }
 
     public Flux<String> autoWrite(AiRequest req, Long userId) {
@@ -64,7 +64,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "写作主题：" + req.getContent();
         if (req.getInstruction() != null) msg += "\n\n补充要求：" + req.getInstruction();
-        return claude.stream(prompts.buildAutoWriteSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildAutoWriteSystem(style), msg);
     }
 
     public Flux<String> imitateWrite(AiRequest req, Long userId) {
@@ -73,7 +73,7 @@ public class AiService {
         String style = getStylePrompt(req.getStyleTemplateId(), userId);
         String msg = "参考文本（请模仿其风格）：\n\n" + req.getContent();
         if (req.getInstruction() != null) msg += "\n\n写作主题：" + req.getInstruction();
-        return claude.stream(prompts.buildImitateSystem(style), msg);
+        return aiProvider.forUser(userId).stream(prompts.buildImitateSystem(style), msg);
     }
 
     /**

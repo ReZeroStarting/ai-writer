@@ -51,7 +51,7 @@ public class LearningService {
         try {
             job.setStatus(LearningJob.JobStatus.PROCESSING);
             jobRepo.save(job);
-            String result = analyzer.analyzeStyle(job.getMaterial().getContent());
+            String result = analyzer.analyzeStyle(job.getUser().getId(), job.getMaterial().getContent());
             job.setResultPrompt(result);
             job.setStatus(LearningJob.JobStatus.COMPLETED);
             StyleTemplate template = job.getTemplate();

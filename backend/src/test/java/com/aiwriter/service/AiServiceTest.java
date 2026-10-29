@@ -1,6 +1,7 @@
 package com.aiwriter.service;
 
 import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.ai.PromptBuilder;
 import com.aiwriter.dto.request.AiRequest;
 import com.aiwriter.exception.ForbiddenException;
@@ -35,6 +36,7 @@ class AiServiceTest {
 
     // 依赖接口而非具体 provider，测试与具体实现（Anthropic/DeepSeek）解耦
     @Mock private AiProvider claude;
+    @Mock private AiProviderResolver claudeResolver;
     @Mock private StyleTemplateRepository styleRepo;
 
     private AiService aiService;
@@ -45,7 +47,8 @@ class AiServiceTest {
     @BeforeEach
     void setUp() {
         // PromptBuilder 无外部依赖，用真实例以便验证 style 真的拼进了 system prompt
-        aiService = new AiService(claude, new PromptBuilder(), styleRepo);
+        aiService = new AiService(claudeResolver, new PromptBuilder(), styleRepo);
+    when(claudeResolver.forUser(any())).thenReturn(claude);
         when(claude.stream(anyString(), anyString())).thenReturn(Flux.just("chunk"));
     }
 

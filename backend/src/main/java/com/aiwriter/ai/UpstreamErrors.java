@@ -26,7 +26,7 @@ final class UpstreamErrors {
         log.error("AI 上游调用失败[{}]: {}", provider, msg);
 
         if (msg.contains("401") || msg.contains("403")) {
-            return "【AI 服务未授权】请检查后端配置的 " + keyName + " 是否有效。";
+            // 可能用的是用户自己在「AI 设置」里填的 key，也可能用的是服务端默认，两种都提示到`n            return "【AI 服务未授权】请检查你在「AI 设置」里填的 API Key 是否有效"`n                    + "（未配置时用的是服务端 " + keyName + "）。";
         }
         if (msg.contains("429")) {
             return "【AI 服务限流】请求过于频繁或额度不足，请稍后再试。";

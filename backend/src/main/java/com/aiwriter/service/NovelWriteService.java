@@ -1,6 +1,6 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
 import com.aiwriter.model.*;
@@ -18,7 +18,7 @@ public class NovelWriteService {
 
     private static final Logger log = LoggerFactory.getLogger(NovelWriteService.class);
 
-    private final AiProvider claudeService;
+    private final AiProviderResolver aiProvider;
     private final ContextBuilder contextBuilder;
     private final ChapterService chapterService;
     private final ConflictService conflictService;
@@ -48,7 +48,7 @@ public class NovelWriteService {
         String systemPrompt = buildNovelSystemPrompt(ctx);
         String userPrompt = buildContinueUserPrompt(ctx, currentContent);
 
-        return persistWhenDone(claudeService.stream(systemPrompt, userPrompt), fw, latest);
+        return persistWhenDone(aiProvider.forUser(userId).stream(systemPrompt, userPrompt), fw, latest);
     }
 
     /**
@@ -76,7 +76,7 @@ public class NovelWriteService {
         String systemPrompt = buildNovelSystemPrompt(ctx);
         String userPrompt = buildContinueChapterUserPrompt(existing);
 
-        return persistWhenDone(claudeService.stream(systemPrompt, userPrompt), fw, latest, existing);
+        return persistWhenDone(aiProvider.forUser(userId).stream(systemPrompt, userPrompt), fw, latest, existing);
     }
 
     public Flux<String> continueWriting(Long userId, Long frameworkId) {
@@ -96,7 +96,7 @@ public class NovelWriteService {
         String systemPrompt = buildNovelSystemPrompt(ctx);
         String userPrompt = buildContinueUserPrompt(ctx, "");
 
-        return persistWhenDone(claudeService.stream(systemPrompt, userPrompt), fw, nextChapter);
+        return persistWhenDone(aiProvider.forUser(userId).stream(systemPrompt, userPrompt), fw, nextChapter);
     }
 
     /**
@@ -118,6 +118,8 @@ public class NovelWriteService {
      * @param baseContent 章节里已有的正文；非空时表示这一轮是「接着写」，落库用追加而不是覆盖
      */
     private Flux<String> persistWhenDone(Flux<String> source, Framework fw, Chapter chapter, String baseContent) {
+        // 作者 id 用于解析「用谁的 key」；在 lambda 外取好，避免在 reactor 回调里碰懒加载代理
+        Long ownerId = fw.getUser() == null ? null : fw.getUser().getId();
         StringBuilder buffer = new StringBuilder();
         return source
                 .doOnNext(buffer::append)
@@ -134,7 +136,7 @@ public class NovelWriteService {
                             // 不能在 reactor-http-nio 线程上 block()，也不能拖慢响应收尾
                             Schedulers.boundedElastic().schedule(() -> {
                                 try {
-                                    int found = conflictService.aiCheckAgainstElements(fw, chapter, full);
+                                    int found = conflictService.aiCheckAgainstElements(ownerId, fw, chapter, full);
                                     if (found > 0) {
                                         log.info("AI 冲突检测: 章节 {} 发现 {} 条语义冲突", chapter.getId(), found);
                                     }

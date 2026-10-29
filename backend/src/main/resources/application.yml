@@ -20,6 +20,8 @@ spring:
 # AI 上游选择：anthropic（缺省）或 deepseek
 ai:
   provider: ${AI_PROVIDER:anthropic}
+  # 用户自带 API Key 的落库加密密钥；不单独配就用 JWT_SECRET 派生
+  key-secret: ${AI_KEY_SECRET:${JWT_SECRET:}}
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}

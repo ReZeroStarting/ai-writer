@@ -10,7 +10,8 @@
         <span class="user-info">{{ auth.user?.username }}</span>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
+            <el-dropdown-item @click="router.push('/settings/ai')">AI 设置</el-dropdown-item>
+            <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>

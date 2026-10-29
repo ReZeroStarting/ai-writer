@@ -1,6 +1,7 @@
 package com.aiwriter.service;
 
-import com.aiwriter.ai.ClaudeService;
+import com.aiwriter.ai.AiProvider;
+import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.dto.request.AiGenerateElementsRequest;
 import com.aiwriter.dto.request.FrameworkElementRequest;
 import com.aiwriter.dto.response.ElementResponse;
@@ -28,7 +29,8 @@ class ElementServiceTest {
 
     @Mock private FrameworkElementRepository elementRepo;
     @Mock private FrameworkService frameworkService;
-    @Mock private ClaudeService claudeService;
+    @Mock private AiProvider claudeService;
+    @Mock private AiProviderResolver aiProviderResolver;
     @InjectMocks private ElementService elementService;
 
     private Framework framework;
@@ -36,6 +38,7 @@ class ElementServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(aiProviderResolver.forUser(any())).thenReturn(claudeService);
         User user = User.builder().id(1L).username("owner").build();
         Project project = Project.builder().id(10L).name("P").user(user).build();
         framework = Framework.builder().id(100L).project(project).user(user)
