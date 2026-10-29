@@ -144,7 +144,7 @@ function statusLabel(s: string) {
   return map[s] ?? s
 }
 
-async function startWriting() {
+async function writeChapter(call: (fwId: number) => Promise<any>) {
   const fwId = fwStore.framework?.id
   if (!fwId) return
   isWriting.value = true
@@ -156,7 +156,7 @@ async function startWriting() {
       currentChapterId.value = chRes.data.id
     } catch { currentChapterId.value = null }
 
-    const response = await frameworkApi.startWriting(fwId)
+    const response = await call(fwId)
     // 后端按 SSE 帧返回，必须解析后再拼接，否则正文里会混进 "data:" 协议头
     await streamSseText(response.data, (text) => { currentContent.value += text })
     // 上游失败时后端把原因当文本帧推下来：提示用户，且绝不能存成章节正文
@@ -175,7 +175,8 @@ async function startWriting() {
     }
     // 后端在流结束时已把正文落库（NovelWriteService#persistWhenDone），
     // 这里只补一次保存兜底，并刷新章节列表 / 框架统计
-    if (currentChapterId.value) {
+    // 流为空时不要保存，否则会把已有章节内容清空
+    if (currentChapterId.value && currentContent.value.trim()) {
       try {
         await frameworkApi.saveChapter(fwId, currentChapterId.value, currentContent.value)
       } catch { /* save failure is non-fatal */ }
@@ -188,9 +189,8 @@ async function startWriting() {
   isWriting.value = false
 }
 
-async function continueWriting() {
-  await startWriting()
-}
+const startWriting = () => writeChapter((fwId) => frameworkApi.startWriting(fwId))
+const continueWriting = () => writeChapter((fwId) => frameworkApi.continueWriting(fwId))
 
 function pauseWriting() {
   isWriting.value = false
