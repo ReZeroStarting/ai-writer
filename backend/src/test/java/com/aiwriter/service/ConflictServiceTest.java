@@ -32,6 +32,7 @@ class ConflictServiceTest {
     @Mock private FrameworkElementRepository elementRepo;
     @Mock private FrameworkService frameworkService;
     @Mock private EventService eventService;
+    @Mock private com.aiwriter.ai.AiProvider aiProvider;
     @InjectMocks private ConflictService conflictService;
 
     private Framework framework;
@@ -183,6 +184,78 @@ class ConflictServiceTest {
         List<Conflict> conflicts = conflictService.checkChapterConsistency(framework, chapter, "AI生成内容");
 
         assertTrue(conflicts.isEmpty());
+        verify(conflictRepo, never()).save(any(Conflict.class));
+    }
+
+    // ---------------------------------------------------------------- AI 语义检查
+
+    private static final String LONG_TEXT = "雨下了一整夜。".repeat(40);
+
+    private FrameworkElement element(String id) {
+        return FrameworkElement.builder()
+                .id(id).version(1).framework(framework)
+                .name("沈砚").type("character").content("盲人剑客，左手使剑，目光锐利").isDeprecated(false).build();
+    }
+
+    @Test
+    void aiCheckShouldRecordConflictsFromModelJson() {
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
+        when(aiProvider.complete(any(), any())).thenReturn(
+                "```json\n[{\"elementId\":\"e1\",\"severity\":\"MAJOR\","
+                        + "\"description\":\"设定写沈砚是盲人，正文却写他「目光锐利地扫过全场」\"}]\n```");
+        when(conflictRepo.save(any(Conflict.class))).thenAnswer(inv -> {
+            Conflict c = inv.getArgument(0);
+            if (c.getId() == null) c.setId(99L);
+            return c;
+        });
+        when(eventService.appendEventInternal(any(), any(), any())).thenReturn(null);
+
+        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+
+        assertEquals(1, created);
+        verify(conflictRepo).save(any(Conflict.class));
+        verify(eventService).appendEventInternal(any(), any(), any());
+    }
+
+    @Test
+    void aiCheckShouldDropUnknownElementIds() {
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
+        when(aiProvider.complete(any(), any())).thenReturn(
+                "[{\"elementId\":\"not-a-real-element\",\"severity\":\"MAJOR\",\"description\":\"胡说\"}]");
+
+        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+
+        assertEquals(0, created);
+        verify(conflictRepo, never()).save(any(Conflict.class));
+    }
+
+    @Test
+    void aiCheckShouldSwallowUnparseableOutput() {
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
+        when(aiProvider.complete(any(), any())).thenReturn("我觉得这一章写得不错，没有矛盾。");
+
+        int created = conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT);
+
+        assertEquals(0, created);
+        verify(conflictRepo, never()).save(any(Conflict.class));
+    }
+
+    @Test
+    void aiCheckShouldSkipShortChaptersAndEmptyFrameworks() {
+        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, "太短了"));
+        verify(aiProvider, never()).complete(any(), any());
+
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of());
+        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT));
+        verify(aiProvider, never()).complete(any(), any());
+    }
+
+    @Test
+    void aiCheckShouldNotPropagateUpstreamFailure() {
+        when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(element("e1")));
+        when(aiProvider.complete(any(), any())).thenThrow(new IllegalStateException("502 上游错误"));
+
+        assertEquals(0, conflictService.aiCheckAgainstElements(framework, chapter, LONG_TEXT));
         verify(conflictRepo, never()).save(any(Conflict.class));
     }
 }
