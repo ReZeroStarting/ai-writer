@@ -64,6 +64,38 @@ class AiProviderResolverTest {
         assertEquals("anthropic", resolver.forUser(2L).providerName());
     }
 
+    /** 市面上的 OpenAI 兼容厂商只差 baseUrl / 模型名，解析器要认得预设 id。 */
+    @Test
+    void shouldBuildAnyOpenAiCompatiblePreset() {
+        for (String id : new String[]{"openai", "moonshot", "zhipu", "dashscope", "gemini", "groq", "openrouter", "ollama"}) {
+            AiProvider p = resolver.build(id, "sk-test", null, null);
+            assertEquals(id, p.providerName(), "预设 " + id + " 没被识别");
+        }
+    }
+
+    @Test
+    void shouldRejectUnknownPreset() {
+        assertThrows(IllegalArgumentException.class, () -> resolver.build("not-a-vendor", "sk", null, null));
+    }
+
+    /** 自定义上游必须给地址和模型，否则等到写作时才报错就太晚了。 */
+    @Test
+    void customNeedsBaseUrlAndModel() {
+        assertThrows(IllegalArgumentException.class, () -> resolver.build("custom", "sk", "some-model", null));
+        assertThrows(IllegalArgumentException.class, () -> resolver.build("custom", "sk", null, "https://example.com/v1"));
+        assertEquals("custom", resolver.build("custom", "sk", "my-model", "https://example.com/v1").providerName());
+    }
+
+    /** 配了但配置坏掉（比如厂商被删）也要能回退，不能让写作 500。 */
+    @Test
+    void shouldFallBackWhenProviderUnknown() {
+        AiSetting s = AiSetting.builder()
+                .userId(5L).provider("some-removed-vendor")
+                .apiKeyEnc(SecretBox.encrypt("sk-1234567890", SECRET)).build();
+        when(settings.findById(5L)).thenReturn(Optional.of(s));
+        assertSame(serverDefault, resolver.forUser(5L));
+    }
+
     @Test
     void shouldFallBackWhenCiphertextCannotBeRead() {
         // 比如服务器换了 key-secret，旧密文解不开：不能 500，回退默认

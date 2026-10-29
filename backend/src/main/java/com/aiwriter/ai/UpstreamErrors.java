@@ -18,15 +18,15 @@ final class UpstreamErrors {
 
     /**
      * @param err      上游异常
-     * @param keyName  该 provider 对应的 API Key 环境变量名，用于 401/403 的提示文案
+     * @param keyHint  已经写好的提示短语，例如「你在「AI 设置」里填的 Key」或「服务端 DEEPSEEK_API_KEY」
      * @param provider provider 标识，用于日志
      */
-    static String describe(Throwable err, String keyName, String provider) {
+    static String describe(Throwable err, String keyHint, String provider) {
         String msg = String.valueOf(err.getMessage());
         log.error("AI 上游调用失败[{}]: {}", provider, msg);
 
         if (msg.contains("401") || msg.contains("403")) {
-            // 可能用的是用户自己在「AI 设置」里填的 key，也可能用的是服务端默认，两种都提示到`n            return "【AI 服务未授权】请检查你在「AI 设置」里填的 API Key 是否有效"`n                    + "（未配置时用的是服务端 " + keyName + "）。";
+            return "【AI 服务未授权】请检查" + keyHint + " 是否有效。";
         }
         if (msg.contains("429")) {
             return "【AI 服务限流】请求过于频繁或额度不足，请稍后再试。";

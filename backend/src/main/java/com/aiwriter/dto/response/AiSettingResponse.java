@@ -8,6 +8,8 @@ import lombok.Data;
 public class AiSettingResponse {
     /** 已保存的 provider；没配置时为空 */
     private String provider;
+    /** 厂商中文名，界面直接显示 */
+    private String providerLabel;
     /** 掩码后的 key，例如 sk-1a2b…9f0e */
     private String maskedKey;
     private String model;

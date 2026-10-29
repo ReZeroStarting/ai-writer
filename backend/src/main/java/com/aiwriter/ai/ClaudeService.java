@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -23,7 +24,8 @@ import java.util.Map;
 @ConditionalOnProperty(name = "ai.provider", havingValue = "anthropic", matchIfMissing = true)
 public class ClaudeService implements AiProvider {
     private static final Logger log = LoggerFactory.getLogger(ClaudeService.class);
-    private static final String KEY_NAME = "ANTHROPIC_API_KEY";
+    /** 401/403 时提示用户到底该查哪个 Key */
+    private final String keyHint;
 
     private final WebClient webClient;
     private final String model;
@@ -31,12 +33,21 @@ public class ClaudeService implements AiProvider {
     private final int maxTokens;
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /** Spring 用这个构造器装配「服务端默认」的那一个 Claude 客户端。 */
+    @Autowired
     public ClaudeService(
             @Value("${anthropic.api-key}") String apiKey,
             @Value("${anthropic.base-url}") String baseUrl,
             @Value("${anthropic.model}") String model,
             @Value("${anthropic.temperature}") double temperature,
             @Value("${anthropic.max-tokens}") int maxTokens) {
+        this(apiKey, baseUrl, model, temperature, maxTokens, "服务端 ANTHROPIC_API_KEY");
+    }
+
+    /** 用户自己在「AI 设置」里配的 Anthropic。 */
+    public ClaudeService(String apiKey, String baseUrl, String model,
+                         double temperature, int maxTokens, String keyHint) {
+        this.keyHint = keyHint;
         this.model = model;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
@@ -70,7 +81,7 @@ public class ClaudeService implements AiProvider {
                 .filter(text -> text != null && !text.isEmpty())
                 // 上游报错时不要以 500 中断连接——把可读原因作为一条流式消息推给前端，
                 // 用户才能知道是「API Key 未配置/无效」还是「额度/网络」问题。
-                .onErrorResume(err -> Flux.just(UpstreamErrors.describe(err, KEY_NAME, providerName())));
+                .onErrorResume(err -> Flux.just(UpstreamErrors.describe(err, keyHint, providerName())));
     }
 
     @Override
@@ -88,7 +99,7 @@ public class ClaudeService implements AiProvider {
         } catch (Exception err) {
             // 与 stream() 保持一致：上游失败时给出可读原因并映射为 502，
             // 而不是把 NPE/WebClientException 直接抛成 500「服务器内部错误」。
-            throw new UpstreamException(UpstreamErrors.describe(err, KEY_NAME, providerName()));
+            throw new UpstreamException(UpstreamErrors.describe(err, keyHint, providerName()));
         }
         return extractContentText(response);
     }

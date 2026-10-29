@@ -1,7 +1,18 @@
 import client from './client'
 
+export interface AiProviderPreset {
+  id: string
+  label: string
+  protocol: string
+  baseUrl: string
+  defaultModel: string
+  consoleUrl: string
+  note: string
+}
+
 export interface AiSetting {
   provider: string | null
+  providerLabel: string | null
   maskedKey: string | null
   model: string | null
   baseUrl: string | null
@@ -19,6 +30,7 @@ export interface AiSettingPayload {
 }
 
 export const aiSettingsApi = {
+  providers: () => client.get<AiProviderPreset[]>('/ai/settings/providers'),
   get: () => client.get<AiSetting>('/ai/settings'),
   save: (data: AiSettingPayload) => client.put<AiSetting>('/ai/settings', data),
   clear: () => client.delete<AiSetting>('/ai/settings'),
