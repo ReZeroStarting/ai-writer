@@ -41,6 +41,7 @@
     <div class="write-controls">
       <template v-if="!isWriting">
         <el-button type="primary" @click="startWriting">开始写作</el-button>
+        <el-button @click="continueThisChapter" :disabled="!currentContent">续写本章</el-button>
         <el-button @click="continueWriting" :disabled="!currentContent">继续下一章</el-button>
       </template>
       <template v-else>
@@ -75,6 +76,7 @@ import { frameworkApi } from '@/api/framework'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading, WarningFilled } from '@element-plus/icons-vue'
 import { streamSseText, isUpstreamErrorNotice } from '@/utils/sse'
+import { elementTypeLabel } from '@/types'
 import { docsApi } from '@/api/documents'
 
 const route = useRoute()
@@ -97,7 +99,8 @@ const contextStats = computed(() => {
     const label = e.type
     grouped[label] = (grouped[label] || 0) + 1
   })
-  return Object.entries(grouped).map(([label, count]) => ({ label, count }))
+  // 后端给的是 CHARACTER / LOCATION 这类枚举，界面上要显示中文
+  return Object.entries(grouped).map(([type, count]) => ({ label: elementTypeLabel(type), count }))
 })
 
 /** 章节列表：此前面板没有任何数据源，永远显示「暂无章节」 */
@@ -144,11 +147,13 @@ function statusLabel(s: string) {
   return map[s] ?? s
 }
 
-async function writeChapter(call: (fwId: number) => Promise<any>) {
+async function writeChapter(call: (fwId: number) => Promise<any>, opts: { append?: boolean } = {}) {
   const fwId = fwStore.framework?.id
   if (!fwId) return
   isWriting.value = true
-  currentContent.value = ''
+  // append 模式：保留画布上已有的正文，把新生成的内容接在后面
+  const base = opts.append ? currentContent.value : ''
+  if (!opts.append) currentContent.value = ''
   try {
     // Fetch latest chapter to get its ID
     try {
@@ -159,11 +164,12 @@ async function writeChapter(call: (fwId: number) => Promise<any>) {
     const response = await call(fwId)
     // 后端按 SSE 帧返回，必须解析后再拼接，否则正文里会混进 "data:" 协议头
     await streamSseText(response.data, (text) => { currentContent.value += text })
+    // 只检查这一轮新增的部分：append 模式下整段正文很长，直接判断会漏掉错误提示
+    const added = currentContent.value.slice(base.length)
     // 上游失败时后端把原因当文本帧推下来：提示用户，且绝不能存成章节正文
-    if (isUpstreamErrorNotice(currentContent.value)) {
-      const notice = currentContent.value.trim()
-      currentContent.value = ''
-      throw new Error(notice)
+    if (isUpstreamErrorNotice(added)) {
+      currentContent.value = base
+      throw new Error(added.trim())
     }
     // 首次写作时，章节是后端在 /write/start 里新建的，开写前前端还拿不到 id，
     // 所以流结束后补取一次，否则「保存兜底」永远会被跳过
@@ -176,7 +182,7 @@ async function writeChapter(call: (fwId: number) => Promise<any>) {
     // 后端在流结束时已把正文落库（NovelWriteService#persistWhenDone），
     // 这里只补一次保存兜底，并刷新章节列表 / 框架统计
     // 流为空时不要保存，否则会把已有章节内容清空
-    if (currentChapterId.value && currentContent.value.trim()) {
+    if (currentChapterId.value && added.trim()) {
       try {
         await frameworkApi.saveChapter(fwId, currentChapterId.value, currentContent.value)
       } catch { /* save failure is non-fatal */ }
@@ -191,6 +197,7 @@ async function writeChapter(call: (fwId: number) => Promise<any>) {
 
 const startWriting = () => writeChapter((fwId) => frameworkApi.startWriting(fwId))
 const continueWriting = () => writeChapter((fwId) => frameworkApi.continueWriting(fwId))
+const continueThisChapter = () => writeChapter((fwId) => frameworkApi.continueChapter(fwId), { append: true })
 
 function pauseWriting() {
   isWriting.value = false

@@ -127,3 +127,8 @@ export const ELEMENT_TYPES = [
   { value: 'EVENT', label: '事件/时间线' },
   { value: 'WORLD_SETTING', label: '世界观设定' },
 ] as const
+
+/** 后端返回的是 CHARACTER/LOCATION 这类枚举，页面上要显示中文。 */
+export function elementTypeLabel(type: string): string {
+  return ELEMENT_TYPES.find(t => t.value === type)?.label ?? type
+}

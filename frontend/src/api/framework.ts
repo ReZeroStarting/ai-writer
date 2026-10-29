@@ -27,6 +27,9 @@ export const frameworkApi = {
     client.post(`/v1/frameworks/${fwId}/write/start`, null, { responseType: 'stream', adapter: 'fetch', timeout: 0 }),
   continueWriting: (fwId: number) =>
     client.post(`/v1/frameworks/${fwId}/write/continue`, null, { responseType: 'stream', adapter: 'fetch', timeout: 0 }),
+  /** 在当前章节后面接着写（不新开章、不重写） */
+  continueChapter: (fwId: number) =>
+    client.post(`/v1/frameworks/${fwId}/write/continue-chapter`, null, { responseType: 'stream', adapter: 'fetch', timeout: 0 }),
   intervene: (fwId: number, data: { content: string; position?: string }) =>
     client.post<Chapter>(`/v1/frameworks/${fwId}/write/interrupt`, data),
   saveChapter: (fwId: number, chapterId: number, content: string) =>

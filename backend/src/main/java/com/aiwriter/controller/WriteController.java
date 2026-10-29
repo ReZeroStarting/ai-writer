@@ -36,6 +36,12 @@ public class WriteController {
         return SseText.escapeAll(novelWriteService.continueWriting(getUserId(auth), frameworkId));
     }
 
+    /** 在本章后面接着写：不新开章，也不重写已有内容。 */
+    @PostMapping(value = "/frameworks/{frameworkId}/write/continue-chapter", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> continueChapter(@PathVariable Long frameworkId, Authentication auth) {
+        return SseText.escapeAll(novelWriteService.continueChapter(getUserId(auth), frameworkId));
+    }
+
     @PostMapping("/frameworks/{frameworkId}/write/interrupt")
     public ResponseEntity<ChapterResponse> intervene(
             @PathVariable Long frameworkId,
