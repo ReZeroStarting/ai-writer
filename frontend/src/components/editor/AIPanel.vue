@@ -20,10 +20,10 @@
           <el-input v-model="instruction" type="textarea" :rows="2" placeholder="额外指令（可选）" size="small" style="margin-top:8px;" />
         </div>
 
-        <div v-if="streaming" class="ai-output">
-          <div class="output-header">AI 生成中...</div>
+        <div v-if="streaming || outputText" class="ai-output">
+          <div class="output-header">{{ streaming ? 'AI 生成中...' : 'AI 生成结果' }}</div>
           <div class="output-content" v-text="outputText"></div>
-          <el-button size="small" type="success" @click="insertText" style="margin-top:8px;">插入到文档</el-button>
+          <el-button size="small" type="success" @click="insertText" style="margin-top:8px;" :disabled="streaming">插入到文档</el-button>
         </div>
       </el-tab-pane>
 
@@ -109,6 +109,7 @@ import { ElMessage } from 'element-plus'
 import { aiApi } from '@/api/ai'
 import { useStyleStore } from '@/stores/styles'
 import { analyzeWriting, type WritingReport } from '@/utils/writingCheck'
+import { streamSseText, isUpstreamErrorNotice } from '@/utils/sse'
 import AiWriteDialog from './AiWriteDialog.vue'
 
 const props = defineProps<{ editorContent: string }>()
@@ -159,14 +160,17 @@ async function callAi(endpoint: string) {
       styleTemplateId: styleId.value,
       instruction: instruction.value || undefined,
     })
-    const reader = response.data.getReader()
-    const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      outputText.value += decoder.decode(value, { stream: true })
+    // 后端按 SSE 帧返回，必须解析后再拼接，否则会把 "data:" 协议头当正文
+    await streamSseText(response.data, (text) => { outputText.value += text })
+    // 上游失败时后端把原因当文本帧推下来，不能留在输出框里被「插入正文」
+    if (isUpstreamErrorNotice(outputText.value)) {
+      const notice = outputText.value.trim()
+      outputText.value = ''
+      throw new Error(notice)
     }
-  } catch (e: any) { ElMessage.error('AI 调用失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e?.message || 'AI 调用失败')
+  }
   streaming.value = false
 }
 

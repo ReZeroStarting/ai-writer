@@ -42,6 +42,22 @@ public class FrameworkService {
         return toResponse(fw);
     }
 
+    /**
+     * 按项目查框架，不存在时返回 {@code null} 而不是抛 404。
+     *
+     * <p>前端进框架页时用它做「是否已开启」的判断：以前靠 404 判断，
+     * 浏览器控制台会留一条刺眼的 404 噪音，语义上也不对——「还没开」不是错误。
+     */
+    public FrameworkResponse findByProjectOrNull(Long userId, Long projectId) {
+        return frameworkRepo.findByProjectId(projectId)
+                .map(fw -> {
+                    if (!fw.getUser().getId().equals(userId))
+                        throw new ForbiddenException("无权操作此框架");
+                    return toResponse(fw);
+                })
+                .orElse(null);
+    }
+
     public FrameworkResponse getByProjectId(Long userId, Long projectId) {
         Framework fw = frameworkRepo.findByProjectId(projectId)
                 .orElseThrow(() -> new NotFoundException("该项目未开启框架模式"));

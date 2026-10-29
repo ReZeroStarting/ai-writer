@@ -18,8 +18,8 @@
       </el-form-item>
     </el-form>
 
-    <div v-if="streaming" class="dialog-output">
-      <div class="output-header">AI 生成中...</div>
+    <div v-if="streaming || outputText" class="dialog-output">
+      <div class="output-header">{{ streaming ? 'AI 生成中...' : 'AI 生成结果' }}</div>
       <div class="output-content" v-text="outputText"></div>
     </div>
 
@@ -40,6 +40,7 @@ import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiApi } from '@/api/ai'
 import { useStyleStore } from '@/stores/styles'
+import { streamSseText, isUpstreamErrorNotice } from '@/utils/sse'
 
 const props = defineProps<{ modelValue?: boolean }>()
 const emit = defineEmits<{
@@ -100,15 +101,16 @@ async function handleGenerate() {
       styleTemplateId: styleId.value,
       instruction: reqInstruction || undefined,
     })
-    const reader = response.data.getReader()
-    const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      outputText.value += decoder.decode(value, { stream: true })
+    // 后端按 SSE 帧返回，必须解析后再拼接，否则会把 "data:" 协议头当正文
+    await streamSseText(response.data, (text) => { outputText.value += text })
+    // 上游失败时后端把原因当文本帧推下来，不能当成正文
+    if (isUpstreamErrorNotice(outputText.value)) {
+      const notice = outputText.value.trim()
+      outputText.value = ''
+      throw new Error(notice)
     }
   } catch (e: any) {
-    ElMessage.error('AI 调用失败')
+    ElMessage.error(e?.response?.data?.message || e?.message || 'AI 调用失败')
   }
   streaming.value = false
 }

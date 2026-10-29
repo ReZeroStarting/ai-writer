@@ -46,7 +46,9 @@
     </el-row>
 
     <el-card class="fw-nav">
-      <el-menu :default-active="route.name as string" mode="horizontal" @select="handleMenuSelect">
+      <!-- key 绑路由名：el-menu 的 default-active 只在初次生效，不重建会出现
+           「内容已切到冲突页，高亮还停在写作工作台」 -->
+      <el-menu :key="String(route.name)" :default-active="route.name as string" mode="horizontal" @select="handleMenuSelect">
         <el-menu-item index="framework">概览</el-menu-item>
         <el-menu-item index="framework-elements">设定元素</el-menu-item>
         <el-menu-item index="framework-write">写作工作台</el-menu-item>
@@ -81,16 +83,21 @@ const fw = computed(() => fwStore.framework)
 onMounted(async () => {
   const projectId = Number(route.params.id)
   try {
+    // 后端未开启框架时返回 204（空 body），不再用 404 当「还没有」的信号
     const res = await frameworkApi.getByProjectId(projectId)
-    fwStore.framework = res.data
-    await fwStore.fetchFramework(res.data.id)
-  } catch {
-    try {
-      await fwStore.openFramework(projectId)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '无法进入框架模式')
-      router.push(`/project/${projectId}`)
+    if (res.status !== 204 && res.data?.id) {
+      fwStore.framework = res.data
+      await fwStore.fetchFramework(res.data.id)
+      return
     }
+  } catch {
+    // 旧后端仍可能返回 404：往下走创建流程
+  }
+  try {
+    await fwStore.openFramework(projectId)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '无法进入框架模式')
+    router.push(`/project/${projectId}`)
   }
 })
 

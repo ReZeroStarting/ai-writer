@@ -16,6 +16,7 @@
           <el-icon><MoreFilled /></el-icon>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item @click="goFramework(p.id)">写作框架</el-dropdown-item>
               <el-dropdown-item @click="startRename(p)">重命名</el-dropdown-item>
               <el-dropdown-item @click="handleDelete(p.id)">删除</el-dropdown-item>
             </el-dropdown-menu>
@@ -65,9 +66,10 @@ const filteredProjects = computed(() => {
 
 function selectProject(id: number) { store.setCurrent(id); router.push(`/project/${id}`) }
 
-// 刷新/直链进来时，从路由参数恢复当前项目，保证 .active 高亮正确
+// 刷新/直链进来时，从路由参数恢复当前项目，保证 .active 高亮正确。
+// 两个路由的参数名不同：project/:id 与 project/:projectId/doc/:docId，都要认。
 watch(
-  () => route.params.id,
+  () => route.params.id ?? route.params.projectId,
   (id) => { if (id) store.setCurrent(Number(id)) },
   { immediate: true },
 )
@@ -88,6 +90,17 @@ async function handleRename() {
 }
 
 async function handleDelete(id: number) { await store.remove(id); ElMessage.success('小说已删除') }
+
+/**
+ * 进入写作框架。
+ *
+ * <p>框架页首次进入会自动创建框架（见 FrameworkView.onMounted），所以这里只负责导航。
+ * 之前没有这个入口，用户只能手敲 /project/:id/framework，教程里写的「侧边栏菜单」也就不存在。
+ */
+function goFramework(id: number) {
+  store.setCurrent(id)
+  router.push(`/project/${id}/framework`)
+}
 </script>
 
 <style scoped>

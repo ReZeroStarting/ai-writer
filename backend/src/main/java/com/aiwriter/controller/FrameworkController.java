@@ -20,7 +20,9 @@ public class FrameworkController {
 
     @GetMapping("/projects/{projectId}/framework")
     public ResponseEntity<FrameworkResponse> getByProject(@PathVariable Long projectId, Authentication auth) {
-        return ResponseEntity.ok(frameworkService.getByProjectId(getUserId(auth), projectId));
+        // 未开启框架 → 204，而不是 404：前端用它判断「要不要创建」，不该在控制台报错
+        FrameworkResponse fw = frameworkService.findByProjectOrNull(getUserId(auth), projectId);
+        return fw == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(fw);
     }
 
     @GetMapping("/frameworks/{id}")
