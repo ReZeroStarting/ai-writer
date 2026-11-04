@@ -1,5 +1,6 @@
 package com.aiwriter.service;
 
+import com.aiwriter.ai.rag.ElementRanker;
 import com.aiwriter.model.*;
 import com.aiwriter.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ class ContextBuilderTest {
 
     @Mock private FrameworkElementRepository elementRepo;
     @Mock private ChapterRepository chapterRepo;
+    @Mock private ElementRanker ranker;
     @InjectMocks private ContextBuilder contextBuilder;
 
     private List<FrameworkElement> elements;
