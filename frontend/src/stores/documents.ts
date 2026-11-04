@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { Document } from '@/types'
 import { docsApi } from '@/api/documents'
 
@@ -24,7 +25,18 @@ export const useDocStore = defineStore('documents', () => {
   }
 
   async function save(id: number, title: string, content: string) {
-    await docsApi.update(id, { title, content })
+    try {
+      await docsApi.update(id, { title, content })
+    } catch (e: any) {
+      // 409 = 乐观锁冲突：同一个文档在别的标签页/设备上被改过。
+      // 不能静默失败，也不能直接覆盖——提示用户并拉回最新版本。
+      if (e?.response?.status === 409) {
+        ElMessage.warning('内容已在别处被修改，已载入最新版本，请确认后重新编辑')
+        await fetchOne(id)
+        return
+      }
+      throw e
+    }
     const d = docs.value.find(d => d.id === id)
     if (d) { d.title = title; d.content = content }
     if (currentDoc.value?.id === id) { currentDoc.value.title = title; currentDoc.value.content = content }
