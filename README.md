@@ -126,6 +126,9 @@ CREATE DATABASE ai_writer DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_
 
 ### 2. 配置环境变量
 
+**完整清单见 [`.env.example`](.env.example)**：里面列了所有变量（含可选调参与默认值），只放键名不放值。
+复制成 `.env` 或直接 `export` / `set` 后填；`.env`、`.env.bat` 和 `application-local.yml` 都已被 `.gitignore` 忽略。
+
 | 变量 | 必须 | 默认值 | 说明 |
 |------|------|--------|------|
 | `AI_PROVIDER` | 否 | `anthropic` | AI 上游选择：`anthropic` 或 `deepseek` |
