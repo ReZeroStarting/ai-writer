@@ -1,7 +1,10 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.ai.engine.AiCallGuard;
+import com.aiwriter.ai.metrics.TokenUsageRecorder;
 import com.aiwriter.model.AiSetting;
 import com.aiwriter.repository.AiSettingRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -26,18 +30,31 @@ class AiProviderResolverTest {
 
     @Mock private AiProvider serverDefault;
     @Mock private AiSettingRepository settings;
+    @Mock private TokenUsageRecorder tokenUsage;
 
     private AiProviderResolver resolver;
 
     @BeforeEach
     void setUp() {
-        resolver = new AiProviderResolver(serverDefault, settings, SECRET);
+        lenient().when(serverDefault.providerName()).thenReturn("anthropic");
+        // 解析器会给每个上游套一层韧性装饰器（超时/重试/熔断），所以断言用 providerName 而不是实例相等
+        resolver = new AiProviderResolver(serverDefault, settings, SECRET, newGuard(), tokenUsage);
+    }
+
+    private static AiCallGuard newGuard() {
+        return new AiCallGuard(new SimpleMeterRegistry(), 5, 0, 5, 30);
+    }
+
+    /** 回退到服务端默认时，返回的是「默认上游 + 韧性层」，名字应仍是默认那家。 */
+    private void assertFellBackToDefault(AiProvider provider) {
+        assertEquals("anthropic", provider.providerName());
+        assertNotSame(serverDefault, provider);
     }
 
     @Test
     void shouldFallBackToServerDefaultWhenNothingSaved() {
         when(settings.findById(1L)).thenReturn(Optional.empty());
-        assertSame(serverDefault, resolver.forUser(1L));
+        assertFellBackToDefault(resolver.forUser(1L));
     }
 
     @Test
@@ -93,7 +110,7 @@ class AiProviderResolverTest {
                 .userId(5L).provider("some-removed-vendor")
                 .apiKeyEnc(SecretBox.encrypt("sk-1234567890", SECRET)).build();
         when(settings.findById(5L)).thenReturn(Optional.of(s));
-        assertSame(serverDefault, resolver.forUser(5L));
+        assertFellBackToDefault(resolver.forUser(5L));
     }
 
     @Test
@@ -103,13 +120,13 @@ class AiProviderResolverTest {
                 .userId(3L).provider("DEEPSEEK").apiKeyEnc("v1:not-a-valid-payload").build();
         when(settings.findById(3L)).thenReturn(Optional.of(broken));
 
-        assertSame(serverDefault, resolver.forUser(3L));
+        assertFellBackToDefault(resolver.forUser(3L));
     }
 
     @Test
     void shouldFallBackWhenKeyBlank() {
         AiSetting blank = AiSetting.builder().userId(4L).provider("DEEPSEEK").apiKeyEnc("").build();
         when(settings.findById(4L)).thenReturn(Optional.of(blank));
-        assertSame(serverDefault, resolver.forUser(4L));
+        assertFellBackToDefault(resolver.forUser(4L));
     }
 }

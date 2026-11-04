@@ -1,5 +1,8 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.ai.engine.AiCallGuard;
+import com.aiwriter.ai.engine.ResilientAiProvider;
+import com.aiwriter.ai.metrics.TokenUsageRecorder;
 import com.aiwriter.model.AiSetting;
 import com.aiwriter.repository.AiSettingRepository;
 import org.slf4j.Logger;
@@ -23,11 +26,18 @@ public class AiProviderResolver {
     private final AiProvider serverDefault;
     private final AiSettingRepository settings;
     private final String secret;
+    private final AiCallGuard guard;
+    private final TokenUsageRecorder tokenUsage;
 
     public AiProviderResolver(AiProvider serverDefault,
                               AiSettingRepository settings,
-                              @Value("${ai.key-secret:}") String secret) {
-        this.serverDefault = serverDefault;
+                              @Value("${ai.key-secret:}") String secret,
+                              AiCallGuard guard,
+                              TokenUsageRecorder tokenUsage) {
+        this.guard = guard;
+        this.tokenUsage = tokenUsage;
+        // 服务端默认上游也套上韧性层：超时/重试/熔断/指标对所有调用一致生效
+        this.serverDefault = new ResilientAiProvider(serverDefault, guard);
         this.settings = settings;
         this.secret = secret;
     }
@@ -74,7 +84,9 @@ public class AiProviderResolver {
         if (AiPresets.isCustom(id)) {
             if (blank(baseUrl)) throw new IllegalArgumentException("自定义上游需要填写接口地址");
             if (blank(model)) throw new IllegalArgumentException("自定义上游需要填写模型名");
-            return new OpenAiCompatibleService("custom", USER_KEY_HINT, apiKey, baseUrl.trim(), model.trim(), 0.7, 4096);
+            return new ResilientAiProvider(
+                    new OpenAiCompatibleService("custom", USER_KEY_HINT, apiKey, baseUrl.trim(), model.trim(), 0.7, 4096, tokenUsage),
+                    guard);
         }
 
         AiPresets.Preset preset = AiPresets.find(id);
@@ -84,9 +96,11 @@ public class AiProviderResolver {
         String m = blank(model) ? preset.defaultModel() : model.trim();
 
         if (preset.protocol() == AiPresets.Protocol.ANTHROPIC) {
-            return new ClaudeService(apiKey, url, m, 0.7, 4096, USER_KEY_HINT);
+            return new ResilientAiProvider(
+                    new ClaudeService(apiKey, url, m, 0.7, 4096, USER_KEY_HINT, tokenUsage), guard);
         }
-        return new OpenAiCompatibleService(preset.id(), USER_KEY_HINT, apiKey, url, m, 0.7, 4096);
+        return new ResilientAiProvider(
+                new OpenAiCompatibleService(preset.id(), USER_KEY_HINT, apiKey, url, m, 0.7, 4096, tokenUsage), guard);
     }
 
     private static boolean blank(String s) {

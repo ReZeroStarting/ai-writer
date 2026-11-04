@@ -4,6 +4,13 @@ server:
 spring:
   application:
     name: ai-writer
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      timeout: 2s
   datasource:
     url: jdbc:mysql://localhost:3306/ai_writer?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
     username: ${MYSQL_USER:root}
@@ -22,6 +29,31 @@ ai:
   provider: ${AI_PROVIDER:anthropic}
   # 用户自带 API Key 的落库加密密钥；不单独配就用 JWT_SECRET 派生
   key-secret: ${AI_KEY_SECRET:${JWT_SECRET:}}
+  # 调用韧性：超时 / 重试 / 熔断（AiCallGuard 读取）
+  engine:
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:90}
+    max-retries: ${AI_MAX_RETRIES:2}
+    breaker-threshold: ${AI_BREAKER_THRESHOLD:5}
+    breaker-open-seconds: ${AI_BREAKER_OPEN_SECONDS:30}
+  # 设定检索（RAG）：超预算时按相关性取前 K 条
+  rag:
+    top-k: ${AI_RAG_TOP_K:12}
+  # 向量化：默认本地哈希（离线、确定性）；配成 openai 则走 /embeddings
+  embedding:
+    provider: ${AI_EMBEDDING_PROVIDER:hashing}
+    base-url: ${AI_EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
+    api-key: ${AI_EMBEDDING_API_KEY:}
+    model: ${AI_EMBEDDING_MODEL:BAAI/bge-m3}
+
+# 可观测性：AI 调用指标（ai_calls_total / ai_call_duration_seconds）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
 
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}

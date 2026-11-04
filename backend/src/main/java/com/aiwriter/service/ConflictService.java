@@ -1,6 +1,8 @@
 package com.aiwriter.service;
 
 import com.aiwriter.ai.AiProviderResolver;
+import com.aiwriter.ai.engine.ConflictFindingParser;
+import com.aiwriter.ai.engine.JsonGuard;
 import com.aiwriter.dto.request.ResolveConflictRequest;
 import com.aiwriter.dto.response.ConflictResponse;
 import com.aiwriter.exception.ForbiddenException;
@@ -178,14 +180,15 @@ public class ConflictService {
         }
 
         int created = 0;
-        for (Finding f : parseFindings(raw)) {
-            FrameworkElement el = byId.get(f.elementId);
-            if (el == null) continue;  // 模型编了一个不存在的 id，丢弃
+        // 只认 byId 里真实存在的设定：模型编造的元素 id 在这一层就被丢掉
+        for (var f : ConflictFindingParser.parse(raw, byId.keySet())) {
+            FrameworkElement el = byId.get(f.elementId());
+            if (el == null) continue;
             Conflict c = Conflict.builder()
                     .framework(fw).elementId(el.getId()).chapter(chapter)
-                    .severity("MAJOR".equalsIgnoreCase(f.severity)
+                    .severity("MAJOR".equalsIgnoreCase(f.severity())
                             ? Conflict.ConflictSeverity.MAJOR : Conflict.ConflictSeverity.MINOR)
-                    .description(f.description)
+                    .description(f.description())
                     .chapterRefVersion(el.getVersion())
                     .currentVersion(el.getVersion())
                     .status(Conflict.ConflictStatus.PENDING)
@@ -196,34 +199,10 @@ public class ConflictService {
                             "elementId", el.getId(), "source", "ai"));
             created++;
         }
-        return created;
-    }
-
-    private record Finding(String elementId, String severity, String description) {
-    }
-
-    /** 模型的输出可能是 ```json 包裹、可能带前后解释，只取第一个 JSON 数组。 */
-    private List<Finding> parseFindings(String raw) {
-        if (raw == null || raw.isBlank()) return List.of();
-        int start = raw.indexOf('[');
-        int end = raw.lastIndexOf(']');
-        if (start < 0 || end <= start) return List.of();
-        try {
-            JsonNode arr = mapper.readTree(raw.substring(start, end + 1));
-            if (!arr.isArray()) return List.of();
-            List<Finding> out = new ArrayList<>();
-            for (JsonNode node : arr) {
-                if (out.size() >= 3) break;
-                String id = node.path("elementId").asText("").trim();
-                String desc = node.path("description").asText("").trim();
-                if (id.isEmpty() || desc.isEmpty()) continue;
-                out.add(new Finding(id, node.path("severity").asText("MINOR"), abbreviate(desc, 300)));
-            }
-            return out;
-        } catch (Exception e) {
-            log.warn("AI 冲突检测返回无法解析，忽略: {}", abbreviate(raw, 200));
-            return List.of();
+        if (created == 0 && raw != null && !raw.isBlank() && !"[]".equals(raw.trim())) {
+            log.warn("AI 冲突检测未产出可信条目: {}", abbreviate(raw, 200));
         }
+        return created;
     }
 
     private static String abbreviate(String text, int max) {

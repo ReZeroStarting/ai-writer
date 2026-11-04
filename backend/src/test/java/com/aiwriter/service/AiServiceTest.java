@@ -3,6 +3,7 @@ package com.aiwriter.service;
 import com.aiwriter.ai.AiProvider;
 import com.aiwriter.ai.AiProviderResolver;
 import com.aiwriter.ai.PromptBuilder;
+import com.aiwriter.ai.engine.PromptRegistry;
 import com.aiwriter.dto.request.AiRequest;
 import com.aiwriter.exception.ForbiddenException;
 import com.aiwriter.exception.NotFoundException;
@@ -46,8 +47,8 @@ class AiServiceTest {
 
     @BeforeEach
     void setUp() {
-        // PromptBuilder 无外部依赖，用真实例以便验证 style 真的拼进了 system prompt
-        aiService = new AiService(claudeResolver, new PromptBuilder(), styleRepo);
+        // PromptBuilder 只依赖提示词注册表，用真实例以便验证 style 真的拼进了 system prompt
+        aiService = new AiService(claudeResolver, new PromptBuilder(new PromptRegistry()), styleRepo);
     when(claudeResolver.forUser(any())).thenReturn(claude);
         when(claude.stream(anyString(), anyString())).thenReturn(Flux.just("chunk"));
     }

@@ -1,5 +1,7 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.ai.metrics.TokenUsageRecorder;
+import com.aiwriter.ai.metrics.UsageScanner;
 import com.aiwriter.exception.UpstreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,15 +35,18 @@ public class OpenAiCompatibleService implements AiProvider {
     private final String model;
     private final double temperature;
     private final int maxTokens;
+    private final TokenUsageRecorder recorder;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public OpenAiCompatibleService(String name, String keyHint, String apiKey, String baseUrl,
-                                   String model, double temperature, int maxTokens) {
+                                   String model, double temperature, int maxTokens,
+                                   TokenUsageRecorder recorder) {
         this.name = name;
         this.keyHint = keyHint;
         this.model = model;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
+        this.recorder = recorder;
         this.webClient = WebClient.builder()
                 .baseUrl(stripTrailingSlash(baseUrl))
                 .defaultHeader("Authorization", "Bearer " + apiKey)
@@ -61,6 +66,7 @@ public class OpenAiCompatibleService implements AiProvider {
     @Override
     public Flux<String> stream(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildRequestBody(systemPrompt, userPrompt, true);
+        UsageScanner usage = new UsageScanner();
         return webClient.post()
                 .uri("/chat/completions")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -71,8 +77,11 @@ public class OpenAiCompatibleService implements AiProvider {
                 // WebClient 在 text/event-stream 下可能已剥掉 "data: " 前缀，也可能保留
                 .map(SseLines::stripDataPrefix)
                 .filter(SseLines::isPayload)
+                .doOnNext(usage::scan)
                 .map(this::extractDeltaText)
                 .filter(text -> text != null && !text.isEmpty())
+                .doOnNext(text -> usage.addOutputChars(text.length()))
+                .doFinally(signal -> recorder.record(name, usage.toUsage(promptChars(systemPrompt, userPrompt))))
                 // 上游失败不中断连接，把可读原因作为一条流式消息推给前端
                 .onErrorResume(err -> Flux.just(UpstreamErrors.describe(err, keyHint, name)));
     }
@@ -92,21 +101,34 @@ public class OpenAiCompatibleService implements AiProvider {
         } catch (Exception err) {
             throw new UpstreamException(UpstreamErrors.describe(err, keyHint, name));
         }
-        return extractContentText(response);
+        String text = extractContentText(response);
+        UsageScanner usage = new UsageScanner();
+        usage.scan(response);
+        usage.addOutputChars(text == null ? 0 : text.length());
+        recorder.record(name, usage.toUsage(promptChars(systemPrompt, userPrompt)));
+        return text;
+    }
+
+    private static int promptChars(String system, String user) {
+        return (system == null ? 0 : system.length()) + (user == null ? 0 : user.length());
     }
 
     private Map<String, Object> buildRequestBody(String system, String user, boolean stream) {
         // OpenAI 协议把 system 放进 messages，而不是放在顶层
-        return Map.of(
-                "model", model,
-                "max_tokens", maxTokens,
-                "temperature", temperature,
-                "messages", List.of(
-                        Map.of("role", "system", "content", system),
-                        Map.of("role", "user", "content", user)
-                ),
-                "stream", stream
-        );
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("model", model);
+        body.put("max_tokens", maxTokens);
+        body.put("temperature", temperature);
+        body.put("messages", List.of(
+                Map.of("role", "system", "content", system),
+                Map.of("role", "user", "content", user)
+        ));
+        body.put("stream", stream);
+        if (stream) {
+            // 不加这个选项，流式响应里不会带 usage，token 只能靠估算
+            body.put("stream_options", Map.of("include_usage", true));
+        }
+        return body;
     }
 
     /** 解析流式分片：<code>{"choices":[{"delta":{"content":"..."}}]}</code> */

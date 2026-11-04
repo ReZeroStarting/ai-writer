@@ -1,5 +1,7 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.ai.metrics.TokenUsageRecorder;
+import com.aiwriter.ai.metrics.UsageScanner;
 import com.aiwriter.exception.UpstreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +33,7 @@ public class ClaudeService implements AiProvider {
     private final String model;
     private final double temperature;
     private final int maxTokens;
+    private final TokenUsageRecorder recorder;
     private final ObjectMapper mapper = new ObjectMapper();
 
     /** Spring 用这个构造器装配「服务端默认」的那一个 Claude 客户端。 */
@@ -40,17 +43,20 @@ public class ClaudeService implements AiProvider {
             @Value("${anthropic.base-url}") String baseUrl,
             @Value("${anthropic.model}") String model,
             @Value("${anthropic.temperature}") double temperature,
-            @Value("${anthropic.max-tokens}") int maxTokens) {
-        this(apiKey, baseUrl, model, temperature, maxTokens, "服务端 ANTHROPIC_API_KEY");
+            @Value("${anthropic.max-tokens}") int maxTokens,
+            TokenUsageRecorder recorder) {
+        this(apiKey, baseUrl, model, temperature, maxTokens, "服务端 ANTHROPIC_API_KEY", recorder);
     }
 
     /** 用户自己在「AI 设置」里配的 Anthropic。 */
     public ClaudeService(String apiKey, String baseUrl, String model,
-                         double temperature, int maxTokens, String keyHint) {
+                         double temperature, int maxTokens, String keyHint,
+                         TokenUsageRecorder recorder) {
         this.keyHint = keyHint;
         this.model = model;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
+        this.recorder = recorder;
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("x-api-key", apiKey)
@@ -66,6 +72,7 @@ public class ClaudeService implements AiProvider {
     @Override
     public Flux<String> stream(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildRequestBody(systemPrompt, userPrompt, true);
+        UsageScanner usage = new UsageScanner();
         return webClient.post()
                 .uri("/v1/messages")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -77,8 +84,11 @@ public class ClaudeService implements AiProvider {
                 // 也可能保留。写死 startsWith("data: ") 会在前者情况下滤光全部内容。
                 .map(SseLines::stripDataPrefix)
                 .filter(SseLines::isPayload)
+                .doOnNext(usage::scan)
                 .map(this::extractDeltaText)
                 .filter(text -> text != null && !text.isEmpty())
+                .doOnNext(text -> usage.addOutputChars(text.length()))
+                .doFinally(signal -> recorder.record(providerName(), usage.toUsage(promptChars(systemPrompt, userPrompt))))
                 // 上游报错时不要以 500 中断连接——把可读原因作为一条流式消息推给前端，
                 // 用户才能知道是「API Key 未配置/无效」还是「额度/网络」问题。
                 .onErrorResume(err -> Flux.just(UpstreamErrors.describe(err, keyHint, providerName())));
@@ -101,7 +111,16 @@ public class ClaudeService implements AiProvider {
             // 而不是把 NPE/WebClientException 直接抛成 500「服务器内部错误」。
             throw new UpstreamException(UpstreamErrors.describe(err, keyHint, providerName()));
         }
-        return extractContentText(response);
+        String text = extractContentText(response);
+        UsageScanner usage = new UsageScanner();
+        usage.scan(response);
+        usage.addOutputChars(text == null ? 0 : text.length());
+        recorder.record(providerName(), usage.toUsage(promptChars(systemPrompt, userPrompt)));
+        return text;
+    }
+
+    private static int promptChars(String system, String user) {
+        return (system == null ? 0 : system.length()) + (user == null ? 0 : user.length());
     }
 
     private Map<String, Object> buildRequestBody(String system, String user, boolean stream) {

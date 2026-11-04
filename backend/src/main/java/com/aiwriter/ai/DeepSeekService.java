@@ -1,5 +1,6 @@
 package com.aiwriter.ai;
 
+import com.aiwriter.ai.metrics.TokenUsageRecorder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,8 @@ public class DeepSeekService extends OpenAiCompatibleService {
             @Value("${deepseek.base-url}") String baseUrl,
             @Value("${deepseek.model}") String model,
             @Value("${deepseek.temperature}") double temperature,
-            @Value("${deepseek.max-tokens}") int maxTokens) {
-        super("deepseek", "服务端 DEEPSEEK_API_KEY", apiKey, baseUrl, model, temperature, maxTokens);
+            @Value("${deepseek.max-tokens}") int maxTokens,
+            TokenUsageRecorder recorder) {
+        super("deepseek", "服务端 DEEPSEEK_API_KEY", apiKey, baseUrl, model, temperature, maxTokens, recorder);
     }
 }

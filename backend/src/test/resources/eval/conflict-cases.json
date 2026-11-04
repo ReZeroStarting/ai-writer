@@ -1,0 +1,56 @@
+[
+  {
+    "name": "正常输出：指向真实设定",
+    "validIds": ["e1", "e2"],
+    "modelOutput": "[{\"elementId\":\"e1\",\"severity\":\"MAJOR\",\"description\":\"设定是盲人，正文却写目光锐利\"}]",
+    "expectCount": 1
+  },
+  {
+    "name": "无矛盾：空数组",
+    "validIds": ["e1"],
+    "modelOutput": "[]",
+    "expectCount": 0
+  },
+  {
+    "name": "编造不存在的设定 id，必须丢弃",
+    "validIds": ["e1"],
+    "modelOutput": "[{\"elementId\":\"ghost-999\",\"severity\":\"MAJOR\",\"description\":\"主角性别不符\"}]",
+    "expectCount": 0
+  },
+  {
+    "name": "代码围栏包裹：仍能解析",
+    "validIds": ["e2"],
+    "modelOutput": "```json\n[{\"elementId\":\"e2\",\"severity\":\"MINOR\",\"description\":\"地点归属不清\"}]\n```",
+    "expectCount": 1
+  },
+  {
+    "name": "前后带解释文字：只取数组",
+    "validIds": ["e1"],
+    "modelOutput": "好的，我检查后发现一处问题：\n[{\"elementId\":\"e1\",\"severity\":\"MAJOR\",\"description\":\"已死亡角色仍在活动\"}]\n以上。",
+    "expectCount": 1
+  },
+  {
+    "name": "完全不是 JSON：安全降级为 0 条",
+    "validIds": ["e1"],
+    "modelOutput": "抱歉，我无法完成这次设定校对。",
+    "expectCount": 0
+  },
+  {
+    "name": "描述为空的条目丢弃",
+    "validIds": ["e1"],
+    "modelOutput": "[{\"elementId\":\"e1\",\"severity\":\"MAJOR\",\"description\":\"   \"}]",
+    "expectCount": 0
+  },
+  {
+    "name": "超过 3 条时截断，避免刷屏",
+    "validIds": ["e1", "e2", "e3", "e4", "e5"],
+    "modelOutput": "[{\"elementId\":\"e1\",\"description\":\"a\"},{\"elementId\":\"e2\",\"description\":\"b\"},{\"elementId\":\"e3\",\"description\":\"c\"},{\"elementId\":\"e4\",\"description\":\"d\"},{\"elementId\":\"e5\",\"description\":\"e\"}]",
+    "expectCount": 3
+  },
+  {
+    "name": "大小写/空白污染的元素 id 不能误匹配",
+    "validIds": ["E1"],
+    "modelOutput": "[{\"elementId\":\"e1 \",\"description\":\"大小写不同应视为不存在\"}]",
+    "expectCount": 0
+  }
+]
