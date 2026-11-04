@@ -1,0 +1,47 @@
+# 本地开发依赖：MySQL + Redis
+#
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down          # 保留数据
+#   docker compose down -v       # 连数据一起删
+#
+# 起来之后按 README 的环境变量启动后端即可（默认连 localhost:3306 / 6379）。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ai-writer-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root123}
+      MYSQL_DATABASE: ai_writer
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_PASSWORD:-root123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-writer-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mysql-data:
+  redis-data:

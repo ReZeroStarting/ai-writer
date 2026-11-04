@@ -13,3 +13,20 @@ tsconfig.tsbuildinfo
 
 # 本机专属 profile（含数据库口令），禁止提交
 backend/src/main/resources/application-local.yml
+
+# 本机密钥（AI provider key），禁止提交
+.env.bat
+
+# 运行时日志（目录里除 *.log 外还有 _pid 等文件）
+backend/logs/
+
+# E2E 产物：依赖、截图、运行结果
+e2e/node_modules/
+e2e/shots/
+e2e/walk-results.json
+walk-results.json
+
+# 本机启动脚本（含机器专属路径与 JWT 密钥），禁止提交
+启动后端.bat
+启动前端.bat
+*.bat

@@ -1,0 +1,14 @@
+{
+  "name": "ai-writer-e2e",
+  "private": true,
+  "description": "本地端到端走查脚本（驱动本机 Chrome，不是 CI 回归套件）",
+  "scripts": {
+    "walk": "node walk-full.js",
+    "pages": "node walk-pages.js",
+    "tail": "node walk-tail.js",
+    "mcp": "node mcp-check.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}
