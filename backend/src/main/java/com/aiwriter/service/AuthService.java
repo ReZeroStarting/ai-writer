@@ -7,12 +7,15 @@ import com.aiwriter.exception.AuthException;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.UserRepository;
 import com.aiwriter.security.JwtTokenProvider;
+import com.aiwriter.security.TokenStore;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ public class AuthService {
     private final UserRepository userRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final TokenStore tokenStore;
 
     public AuthResponse register(RegisterRequest req) {
         // 前置检查：给出友好提示（覆盖绝大多数情况）
@@ -97,15 +101,33 @@ public class AuthService {
             throw new AuthException("刷新令牌无效或已过期");
         }
         Long userId = tokenProvider.getUserIdFromToken(refreshToken);
+        String jti = tokenProvider.getJti(refreshToken);
+        // 原子消费 jti：并发刷新时只有一个能拿到 true，其余全部失效。
+        // 不能用「先校验再作废」——那中间存在竞态窗口，5 个并发刷新会全部成功。
+        if (!tokenStore.consume(userId, jti)) {
+            log.warn("刷新被拒：jti 不存在或已被消费 userId={}, jti={}", userId, jti);
+            throw new AuthException("刷新令牌已失效，请重新登录");
+        }
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new AuthException("用户不存在"));
         return buildAuthResponse(user);
     }
 
+    /** 登出：把当前 refresh 的 jti 从白名单删掉，之后无法再刷新。 */
+    public void logout(String refreshToken) {
+        if (refreshToken == null || !tokenProvider.validateRefreshToken(refreshToken)) return;
+        Long userId = tokenProvider.getUserIdFromToken(refreshToken);
+        tokenStore.revoke(userId, tokenProvider.getJti(refreshToken));
+        log.info("用户登出，refresh 已作废 userId={}", userId);
+    }
+
     private AuthResponse buildAuthResponse(User user) {
+        String jti = UUID.randomUUID().toString();
+        String refreshToken = tokenProvider.generateRefreshToken(user.getId(), jti);
+        tokenStore.save(user.getId(), jti, tokenProvider.refreshTokenTtl());
         return AuthResponse.builder()
                 .accessToken(tokenProvider.generateAccessToken(user.getId(), user.getUsername()))
-                .refreshToken(tokenProvider.generateRefreshToken(user.getId()))
+                .refreshToken(refreshToken)
                 .user(AuthResponse.UserInfo.builder()
                         .id(user.getId()).username(user.getUsername())
                         .email(user.getEmail()).phone(user.getPhone())

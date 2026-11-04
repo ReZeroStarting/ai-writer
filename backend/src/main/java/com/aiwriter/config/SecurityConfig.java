@@ -29,6 +29,14 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                // 健康检查要给 K8s / 负载均衡探活用，不能要求令牌
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                // Prometheus 抓取端点：抓取器通常不便携带 JWT。
+                // 生产环境应只在内网暴露（或放在独立的管理端口），不要直接对公网开放。
+                .requestMatchers("/actuator/prometheus").permitAll()
+                // 错误页必须放行：否则 415/400 这类由容器转发到 /error 的请求
+                // 会被二次鉴权拦成 401，把真实状态码盖掉。
+                .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
             )
             // 未携带/携带无效令牌 → 401（前端据此触发刷新）；已认证但无权限 → 403

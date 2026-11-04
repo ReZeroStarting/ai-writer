@@ -31,4 +31,14 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest req) {
         return ResponseEntity.ok(authService.refresh(req.getRefreshToken()));
     }
+
+    /**
+     * 登出：作废当前 refresh token 的白名单记录。
+     * 用 refresh token 本身证明身份，因此不需要额外的 access token。
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody RefreshRequest req) {
+        authService.logout(req.getRefreshToken());
+        return ResponseEntity.noContent().build();
+    }
 }

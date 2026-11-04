@@ -7,6 +7,7 @@ import com.aiwriter.exception.AuthException;
 import com.aiwriter.model.User;
 import com.aiwriter.repository.UserRepository;
 import com.aiwriter.security.JwtTokenProvider;
+import com.aiwriter.security.TokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,7 @@ class AuthServiceTest {
     @Mock private UserRepository userRepo;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtTokenProvider tokenProvider;
+    @Mock private TokenStore tokenStore;
     @InjectMocks private AuthService authService;
 
     private RegisterRequest registerRequest;
@@ -57,7 +59,10 @@ class AuthServiceTest {
                 .build();
 
         when(tokenProvider.generateAccessToken(anyLong(), anyString())).thenReturn("access-token");
-        when(tokenProvider.generateRefreshToken(anyLong())).thenReturn("refresh-token");
+        // 现在签发 refresh 会带 jti，并把 jti 登记到 Redis 白名单
+        when(tokenProvider.generateRefreshToken(anyLong(), anyString())).thenReturn("refresh-token");
+        when(tokenProvider.refreshTokenTtl()).thenReturn(java.time.Duration.ofDays(7));
+        when(tokenStore.consume(anyLong(), any())).thenReturn(true);
     }
 
     @Test
@@ -194,12 +199,28 @@ class AuthServiceTest {
     void shouldRefreshToken() {
         when(tokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
         when(tokenProvider.getUserIdFromToken("refresh-token")).thenReturn(1L);
+        when(tokenProvider.getJti("refresh-token")).thenReturn("old-jti");
         when(userRepo.findById(1L)).thenReturn(Optional.of(savedUser));
 
         AuthResponse response = authService.refresh("refresh-token");
 
         assertNotNull(response);
         assertEquals("access-token", response.getAccessToken());
+        // 轮换：旧 jti 必须被原子消费掉
+        verify(tokenStore).consume(1L, "old-jti");
+    }
+
+    /** 白名单里没有（已登出或已被轮换）的 refresh，即使签名有效也不能再用。 */
+    @Test
+    void shouldRejectRefreshNotInWhitelist() {
+        when(tokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
+        when(tokenProvider.getUserIdFromToken("refresh-token")).thenReturn(1L);
+        when(tokenProvider.getJti("refresh-token")).thenReturn("revoked-jti");
+        when(tokenStore.consume(1L, "revoked-jti")).thenReturn(false);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> authService.refresh("refresh-token"));
+        assertEquals("刷新令牌已失效，请重新登录", ex.getMessage());
     }
 
     @Test
