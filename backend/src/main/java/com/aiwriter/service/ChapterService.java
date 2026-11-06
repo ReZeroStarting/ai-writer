@@ -27,9 +27,14 @@ public class ChapterService {
             snapshot.put(e.getId(), e.getVersion());
         }
 
+        // 必须拿托管实体：Document 有 @Version，用 builder().id() 造的空壳会被 Hibernate
+        // 判成"脱离态 + version 为 null"而拒绝保存（真实踩过的坑，write/start 直接 500）
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("文档不存在: " + documentId));
+
         Chapter ch = Chapter.builder()
                 .framework(fw)
-                .document(Document.builder().id(documentId).build())
+                .document(document)
                 .chapterIndex(chapterIndex)
                 .elementSnapshot(toJson(snapshot))
                 .status(Chapter.ChapterStatus.DRAFT)
@@ -138,3 +143,4 @@ public class ChapterService {
         catch (Exception e) { return "{}"; }
     }
 }
+

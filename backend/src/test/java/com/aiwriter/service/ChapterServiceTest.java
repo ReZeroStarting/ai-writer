@@ -25,6 +25,7 @@ class ChapterServiceTest {
 
     @Mock private ChapterRepository chapterRepo;
     @Mock private FrameworkElementRepository elementRepo;
+    @Mock private DocumentRepository documentRepo;
     @Mock private EventService eventService;
     @InjectMocks private ChapterService chapterService;
 
@@ -51,6 +52,9 @@ class ChapterServiceTest {
         FrameworkElement e2 = FrameworkElement.builder().id("e2").version(2).framework(framework)
                 .type("location").name("长安").content("都城").isDeprecated(false).build();
         when(elementRepo.findLatestByFrameworkId(100L)).thenReturn(List.of(e1, e2));
+        // createChapter 现在必须拿到托管 Document（带 @Version），否则真库里会报"脱离态"
+        when(documentRepo.findById(10L)).thenReturn(Optional.of(
+                Document.builder().id(10L).version(0L).content("").build()));
         when(chapterRepo.save(any(Chapter.class))).thenAnswer(inv -> {
             Chapter c = inv.getArgument(0);
             c.setId(1L);
@@ -172,3 +176,5 @@ class ChapterServiceTest {
         assertNull(response.getDocumentId());
     }
 }
+
+
