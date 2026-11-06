@@ -311,3 +311,26 @@ CI（`.github/workflows/ci.yml`）在 push / PR 到 `main` / `master` 时自动�
 ## 版本
 
 当前 `0.1.0`（`backend/pom.xml`、`frontend/package.json`）。
+
+### 向量库（可选）
+
+`ai.rag.vector-store=qdrant` 时，设定检索从"内存逐条算余弦"切换到 Qdrant（REST，带 payload 过滤）；
+默认 `memory` 行为不变。启动方式：
+
+```bash
+docker run -d --name qdrant -p 6333:6333 -v D:/Docker/data/qdrant:/qdrant/storage qdrant/qdrant
+```
+
+元素增改后自动 upsert，全量重建用 `POST /api/v1/frameworks/{id}/elements/reindex`。
+
+### 本地 embedding 服务（可选）
+
+Java 侧不方便直接跑 transformers，仓库里带了一个 OpenAI 兼容的本地服务：
+
+```bash
+python tools/bge-embedding-server.py --port 8010
+# 然后配：AI_EMBEDDING_PROVIDER=openai
+#        AI_EMBEDDING_BASE_URL=http://127.0.0.1:8010/v1
+```
+
+配合 `ai.rag.hybrid=true`（默认）可开启"向量 + 关键词 RRF 融合"的混合检索。
