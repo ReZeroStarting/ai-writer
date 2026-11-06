@@ -26,7 +26,7 @@ class ContextBuilderRagTest {
 
     private final FrameworkElementRepository elementRepo = mock(FrameworkElementRepository.class);
     private final ChapterRepository chapterRepo = mock(ChapterRepository.class);
-    private final ElementRanker ranker = new ElementRanker(new HashingEmbeddingModel(), 5);
+    private final ElementRanker ranker = new ElementRanker(new HashingEmbeddingModel(), mock(org.springframework.beans.factory.ObjectProvider.class), 5, true);
     private final ContextBuilder builder = new ContextBuilder(elementRepo, chapterRepo, ranker);
 
     @Test
@@ -61,3 +61,5 @@ class ContextBuilderRagTest {
         assertThat(itemCount).isLessThanOrEqualTo(5);
     }
 }
+
+

@@ -67,5 +67,17 @@ public class ElementController {
         return ResponseEntity.ok(elementService.aiGenerate(getUserId(auth), frameworkId, req));
     }
 
+    /**
+     * 全量重建该框架的向量索引（换 embedding、维度变了、或索引从没建过时用）。
+     * 没有配置向量库时返回 0，不报错。
+     */
+    @PostMapping("/frameworks/{frameworkId}/elements/reindex")
+    public ResponseEntity<java.util.Map<String, Object>> reindex(
+            @PathVariable Long frameworkId,
+            Authentication auth) {
+        int n = elementService.reindex(getUserId(auth), frameworkId);
+        return ResponseEntity.ok(java.util.Map.of("indexed", n));
+    }
+
     private Long getUserId(Authentication auth) { return (Long) auth.getPrincipal(); }
 }

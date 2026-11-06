@@ -38,6 +38,14 @@ ai:
   # 设定检索（RAG）：超预算时按相关性取前 K 条
   rag:
     top-k: ${AI_RAG_TOP_K:12}
+    # 检索层：memory = 内存余弦（默认）；qdrant = 走向量库（带 payload 过滤）
+    vector-store: ${AI_RAG_VECTOR_STORE:memory}
+    # 混合检索：向量 + 关键词 bigram，RRF 融合
+    hybrid: ${AI_RAG_HYBRID:true}
+    qdrant:
+      url: ${AI_RAG_QDRANT_URL:http://localhost:6333}
+      collection: ${AI_RAG_QDRANT_COLLECTION:aiwriter_elements}
+      dim: ${AI_RAG_QDRANT_DIM:512}
   # 向量化：默认本地哈希（离线、确定性）；配成 openai 则走 /embeddings
   embedding:
     provider: ${AI_EMBEDDING_PROVIDER:hashing}
@@ -74,3 +82,5 @@ jwt:
   secret: ${JWT_SECRET:}
   access-token-expiration: 1800000
   refresh-token-expiration: 604800000
+
+

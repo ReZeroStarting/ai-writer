@@ -12,7 +12,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ElementRankerTest {
 
-    private final ElementRanker ranker = new ElementRanker(new HashingEmbeddingModel(), 2);
+    /** 无向量库（默认内存路径）。 */
+    private static org.springframework.beans.factory.ObjectProvider<VectorIndex> noIndex() {
+        return org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+    }
+
+    private final ElementRanker ranker = new ElementRanker(new HashingEmbeddingModel(), noIndex(), 2, true);
 
     private FrameworkElement element(String id, String type, String name, String content) {
         return FrameworkElement.builder().id(id).version(1).framework(Framework.builder().id(1L).build())
@@ -39,13 +44,18 @@ class ElementRankerTest {
     }
 
     @Test
-    @DisplayName("元素数量不超过 K 时原样返回，不做无谓向量化")
-    void returnsAllWhenUnderK() {
+    @DisplayName("元素数量不超过 K 时仍全部返回，但按相关性排序（不再直接返回原顺序）")
+    void ranksEvenWhenUnderK() {
         List<FrameworkElement> small = List.of(
                 element("a", "character", "甲", "一"),
                 element("b", "character", "乙", "二"));
 
-        assertThat(ranker.rank(small, "任意查询")).isSameAs(small);
+        List<FrameworkElement> out = ranker.rank(small, "一");
+
+        assertThat(out).hasSize(2);
+        assertThat(out).containsExactlyInAnyOrderElementsOf(small);
+        // 查询是"一"，含"一"的 a 应排在前面；这条断言守住"数量少也要排序"的语义
+        assertThat(out.get(0).getId()).isEqualTo("a");
     }
 
     @Test
@@ -64,3 +74,5 @@ class ElementRankerTest {
         assertThat(ranker.rank(null, "x")).isEmpty();
     }
 }
+
+
