@@ -88,14 +88,21 @@ public class NovelWriteService {
 
         Chapter latest = chapterService.getLatestChapter(frameworkId);
         int nextIdx = (latest != null) ? latest.getChapterIndex() + 1 : 1;
+
+        // 上一章正文要作为 RAG 的查询词：否则 ContextBuilder 拿到空串，
+        // ElementRanker 直接返回原顺序，设定一条都不会按相关性筛（等于白接向量库）。
+        // 注意：前文本身由 ContextBuilder 的 recentContent 负责，这里只解决"检索用什么查"。
+        String previousContent = latest != null && latest.getDocument() != null
+                ? HtmlText.htmlToPlain(latest.getDocument().getContent()) : "";
+
         Document doc = createEmptyDocument(userId, fw.getProject().getId());
         Chapter nextChapter = chapterService.createChapter(fw, nextIdx, doc.getId());
         nextChapter = chapterService.markGenerating(nextChapter.getId());
 
-        ContextBuilder.ContextPackage ctx = contextBuilder.buildContext(frameworkId, "");
+        ContextBuilder.ContextPackage ctx = contextBuilder.buildContext(frameworkId, previousContent);
 
         String systemPrompt = buildNovelSystemPrompt(ctx);
-        String userPrompt = buildContinueUserPrompt(ctx, "");
+        String userPrompt = buildContinueUserPrompt(ctx, previousContent);
 
         return persistWhenDone(aiProvider.forUser(userId).stream(systemPrompt, userPrompt), fw, nextChapter);
     }
@@ -234,3 +241,4 @@ public class NovelWriteService {
         return sb.toString();
     }
 }
+
