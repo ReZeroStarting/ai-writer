@@ -121,13 +121,11 @@ public class McpToolRegistry {
 
     /** RAG 工具的落地实现：与续写用的是同一个向量模型，保证"检索口径"一致。 */
     private String rankElements(Long userId, long frameworkId, String query, int topK) {
-        List<ElementResponse> elements = elementService.list(userId, frameworkId, null);
-        if (elements.isEmpty() || query.isBlank()) return "没有可检索的设定元素";
-        float[] q = embeddingModel.embed(query);
-        List<ElementResponse> ranked = elements.stream()
-                .sorted(Comparator.comparingDouble((ElementResponse e) -> cosine(q, e)).reversed())
-                .limit(topK)
-                .toList();
+        // 统一走 ElementRanker：向量库（或内存余弦）+ 关键词混合检索，
+        // 和续写链路保持同一口径（之前这里自己算了一遍余弦，导致两条路径不一致）
+        List<ElementResponse> ranked = elementService.rankElements(userId, frameworkId, query, topK)
+                .stream().map(elementService::toResponse).toList();
+        if (ranked.isEmpty() || query.isBlank()) return "没有可检索的设定元素";
         List<Map<String, Object>> brief = ranked.stream().map(e -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", e.getId());
@@ -163,3 +161,4 @@ public class McpToolRegistry {
         }
     }
 }
+

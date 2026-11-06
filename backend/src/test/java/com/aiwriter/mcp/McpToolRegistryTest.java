@@ -16,7 +16,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -84,11 +86,18 @@ class McpToolRegistryTest {
     @Test
     @DisplayName("rank_elements：按查询相关性返回，最相关的排第一")
     void ranksElements() {
-        when(elementService.list(anyLong(), anyLong(), any())).thenReturn(List.of(
-                ElementResponse.builder().id("e1").type("location").name("长安城")
-                        .content("唐朝都城，城门由禁军守卫").version(1).build(),
-                ElementResponse.builder().id("e2").type("item").name("锅具")
-                        .content("厨房用的锅").version(1).build()));
+        // 现在 rank_elements 走 ElementService.rankElements（统一到 ElementRanker），不再自己算余弦
+        var el1 = com.aiwriter.model.FrameworkElement.builder().id("e1").version(1)
+                .type("location").name("长安城").content("唐朝都城，城门由禁军守卫").isDeprecated(false).build();
+        var el2 = com.aiwriter.model.FrameworkElement.builder().id("e2").version(1)
+                .type("item").name("锅具").content("厨房用的锅").isDeprecated(false).build();
+        when(elementService.rankElements(anyLong(), anyLong(), anyString(), anyInt()))
+                .thenReturn(List.of(el1, el2));
+        when(elementService.toResponse(any())).thenAnswer(inv -> {
+            com.aiwriter.model.FrameworkElement e = inv.getArgument(0);
+            return ElementResponse.builder().id(e.getId()).type(e.getType()).name(e.getName())
+                    .content(e.getContent()).version(e.getVersion()).build();
+        });
 
         String text = registry.call("rank_elements",
                 mapper.createObjectNode().put("frameworkId", 1).put("query", "长安城 城门"), 7L);
@@ -107,3 +116,5 @@ class McpToolRegistryTest {
         assertThat(text).contains("不是框架模式");
     }
 }
+
+

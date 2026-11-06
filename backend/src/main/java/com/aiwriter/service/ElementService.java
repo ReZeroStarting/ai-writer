@@ -21,6 +21,8 @@ public class ElementService {
     private final AiProviderResolver aiProvider;
     /** 向量索引（可选）：配 ai.rag.vector-store=qdrant 才有实现，否则为 null。 */
     private final org.springframework.beans.factory.ObjectProvider<com.aiwriter.ai.rag.VectorIndex> vectorIndexes;
+    /** 相关性排序（可选，测试里可以没有）。 */
+    private final org.springframework.beans.factory.ObjectProvider<com.aiwriter.ai.rag.ElementRanker> rankers;
 
     /** 把元素写进向量索引（best-effort，失败只记日志，不回滚业务）。 */
     private void indexUpsert(FrameworkElement el) {
@@ -93,6 +95,21 @@ public class ElementService {
         com.aiwriter.ai.rag.VectorIndex idx = vectorIndexes.getIfAvailable();
         if (idx == null) return 0;
         return idx.reindex(frameworkId, elementRepo.findLatestByFrameworkId(frameworkId));
+    }
+
+    /**
+     * 按相关性检索该框架的设定元素。
+     *
+     * <p>MCP 的 rank_elements 和续写用的必须是**同一条检索链路**（同一个 ElementRanker），
+     * 否则会出现"工具里查得到、续写里查不到"的口径分裂。
+     */
+    public List<FrameworkElement> rankElements(Long userId, Long frameworkId, String query, int topK) {
+        frameworkService.findOwned(userId, frameworkId);
+        List<FrameworkElement> elements = elementRepo.findLatestByFrameworkId(frameworkId);
+        if (rankers == null) return elements.stream().limit(topK).toList();
+        com.aiwriter.ai.rag.ElementRanker ranker = rankers.getIfAvailable();
+        if (ranker == null) return elements.stream().limit(topK).toList();
+        return ranker.rank(elements, query).stream().limit(topK).toList();
     }
 
     public List<ElementResponse> getVersions(Long userId, Long frameworkId, String elementId) {
@@ -180,7 +197,8 @@ public class ElementService {
         }
     }
 
-    private ElementResponse toResponse(FrameworkElement e) {
+    /** 暴露给 MCP 工具复用，避免两处各写一遍映射。 */
+    public ElementResponse toResponse(FrameworkElement e) {
         return ElementResponse.builder()
                 .id(e.getId()).version(e.getVersion())
                 .type(e.getType()).name(e.getName()).content(e.getContent())
@@ -188,4 +206,7 @@ public class ElementService {
                 .createdAt(e.getCreatedAt().toString()).build();
     }
 }
+
+
+
 
